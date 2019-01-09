@@ -1,4 +1,4 @@
-# Nova Functions
+# Nova Azure Functions
 Web API framework for Azure Functions written in TypeScript.
 
 ## Install
