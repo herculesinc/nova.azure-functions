@@ -1,0 +1,39 @@
+{
+  "name": "@nova/azure-functions",
+  "version": "0.1.0",
+  "description": "Serverless action-based Web API framework written in TypeScript",
+  "keywords": [
+    "restful",
+    "rest",
+    "api",
+    "web",
+    "framework",
+    "serverless",
+    "azure",
+    "azure functions"
+  ],
+  "main": "index.js",
+  "typings": "nova-azure-functions.d.ts",
+  "license": "MIT",
+  "author": {
+    "name": "Credo360, Inc.",
+    "email": "developers@credo360.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/herculesinc/nova.azure-functions.git"
+  },
+  "engines": {
+    "node": "10.13.x"
+  },
+  "dependencies": {
+    "ajv": "6.5.x",
+    "busboy": "0.2.x",
+    "find-my-way": "1.15.x",
+    "type-is": "1.6.x"
+  },
+  "devDependencies": {
+    "del": "3.0.x",
+    "gulp": "4.0.x"
+  }
+}

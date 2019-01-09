@@ -1,0 +1,31 @@
+{
+  "azureFunctions.projectRuntime": "~2",
+  "azureFunctions.projectLanguage": "JavaScript",
+  "azureFunctions.templateFilter": "Verified",
+  "azureFunctions.deploySubpath": ".",
+  "azureFunctions.preDeployTask": "installExtensions",
+  "debug.internalConsoleOptions": "neverOpen",
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    ".gitignore": true,
+    ".gitattributes": true,
+    ".npmignore": true,
+    "package-lock.json": true,
+    "**/*.js.map": true,
+    "examples/bin": true,
+    "examples/obj": true,
+    "examples/extensions.csproj": true
+  },
+  "search.exclude": {
+      "**/node_modules": true,
+      "**/bower_components": true,
+      "**/*.js": true,
+      "**/bin": true,
+      "**/obj": true,
+      "package-lock.json": true
+  }
+}

@@ -1,0 +1,286 @@
+declare module "@nova/azure-functions" {
+    
+    // IMPORTS
+    // --------------------------------------------------------------------------------------------
+    import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
+    
+    // GLOBALS
+    // --------------------------------------------------------------------------------------------
+    export const symbols: {
+        responseStatus  : Symbol;
+        responseHeaders : Symbol;
+    };
+
+    export const parsers: {
+        multipart       : HttpBodyParser<OperationContext>;
+    };
+
+    // EXECUTOR
+    // --------------------------------------------------------------------------------------------
+    export interface Executor <T extends OperationContext, V> {
+        
+        createContext(options: OperationContextConfig<V>): Promise<T>;
+        closeContext(context: T, error?: Error): Promise<void>;
+
+        execute(actions: Action[], inputs: any, context?: T): Promise<any>;
+    }
+    
+    export interface Action {
+        (inputs: any, context?: OperationContext): Promise<any>
+    }
+
+    export interface OperationContext {
+        readonly id         : string;
+        readonly name       : string;
+        readonly origin     : string;
+        readonly timestamp  : number;
+        readonly log        : Logger;
+    }
+
+    export interface OperationContextConfig<V> {
+        readonly id         : string;
+        readonly name       : string;
+        readonly origin     : string;
+        readonly logger     : Logger;
+        readonly options?   : V;
+    }
+
+    // HTTP CONTROLLER
+    // --------------------------------------------------------------------------------------------
+    export interface HttpControllerConfig<T extends OperationContext, V> {
+        adapter?        : HttpRequestAdapter<V>;
+        executor?       : Executor<T, V>;
+        routerOptions?  : HttpRouterConfig;
+        defaults?       : HttpEndpointDefaults<T>;
+    }
+
+    export interface HttpRouterConfig {
+        ignoreTrailingSlash?    : boolean;
+        maxParamLength?         : boolean;
+        allowUnsafeRegex?       : boolean;
+    }
+
+    export interface HttpRequestAdapter<V> {
+        (request: HttpRequestHead, context: AzureFunctionContext, options?: V): OperationContextConfig<V>;
+    }
+
+    export interface HttpRequestHead {
+        route       : string;
+        method      : string;
+        headers     : StringBag;
+        ip          : string;
+        url         : string;
+    }
+
+    export interface HttpEndpointDefaults<T extends OperationContext> {
+        scope?      : string;
+        cors?       : CorsOptions;
+        inputs?     : object;
+        auth?       : Authenticator<T>;
+        view?       : ViewBuilder;
+    }
+
+    export interface HttpRouteConfig<T extends OperationContext, V> {
+        get?    : HttpEndpointConfig<T,V>;
+        post?   : HttpEndpointConfig<T,V>;
+        put?    : HttpEndpointConfig<T,V>;
+        patch?  : HttpEndpointConfig<T,V>;
+        delete? : HttpEndpointConfig<T,V>;
+        cors?   : CorsOptions;
+    }
+
+    export interface HttpEndpointConfig<T extends OperationContext, V> {
+        scope?      : string;
+        options?    : V;
+        defaults?   : object;
+        body?       : HttpBodyParser<T>;
+        inputs?     : HttpInputProcessor;
+        auth?       : Authenticator<T>;
+        action?     : Action;
+        actions?    : Action[];
+        view?       : ViewBuilder;
+    }
+
+    export interface HttpBodyParser<T extends OperationContext> {
+        (request: AzureHttpRequest, context?: T): Promise<any>;
+    }
+
+    export interface HttpInputProcessor {
+        (body?: object, query?: object, params?: object, defaults?: object): HttpInputProcessorResult;
+    }
+
+    export interface HttpInputProcessorResult {
+        action? : object;
+        view?   : object;
+    }
+
+    export class HttpController<T extends OperationContext, V> {
+
+        constructor(options?: HttpControllerConfig<T,V>);
+
+        set(functionName: string, path: string, config: HttpEndpointConfig<T,V>);
+
+        handler(context: AzureFunctionContext, request: AzureHttpRequest): Promise<AzureHttpResponse>;
+    }
+
+    // QUEUE CONTROLLER
+    // --------------------------------------------------------------------------------------------
+    export interface QueueControllerConfig<T extends OperationContext, V> {
+        adapter?    : QueueAdapter<V>;
+        executor?   : Executor<T, V>;
+    }
+
+    export interface QueueAdapter<V> {
+        (context: AzureFunctionContext, options?: V): OperationContextConfig<V>;
+    }
+
+    export interface QueueTaskConfig<T extends OperationContext, V> {
+        options?    : V;
+        defaults?   : object;
+        inputs?     : QueueInputProcessor;
+        action?     : Action;
+        actions?    : Action[];
+    }
+
+    export interface QueueInputProcessor {
+        (message: object, defaults: object, meta: QueueMessageMetadata): object;
+    }
+
+    export interface QueueMessageMetadata {
+        messageId       : string;
+        insertionTime   : number;
+        expirationTime  : number;
+        nextVisibleTime : number;
+        dequeueCount    : number;
+        popReceipt      : string;
+    }
+
+    export class QueueController<T extends OperationContext, V> {
+
+        constructor(options?: QueueControllerConfig<T,V>);
+
+        set(functionName: string, taskConfig: QueueTaskConfig<T,V>);
+
+        handler(context: AzureFunctionContext, message: object): Promise<void>;
+    }
+
+    // TIMER CONTROLLER
+    // --------------------------------------------------------------------------------------------
+    export interface TimerControllerConfig<T extends OperationContext, V> {
+        adapter?    : TimerAdapter<V>;
+        executor?   : Executor<T, V>;
+    }
+
+    export interface TimerAdapter<V> {
+        (context: AzureFunctionContext, options?: V): OperationContextConfig<V>;
+    }
+
+    export interface TimerHandlerConfig<T extends OperationContext, V> {
+        options?    : V;
+        defaults?   : object;
+        action?     : Action;
+        actions?    : Action[];
+    }
+
+    export class TimerController<T extends OperationContext, V> {
+
+        constructor(options?: TimerControllerConfig<T,V>);
+
+        set(timerConfig: TimerHandlerConfig<T,V>);
+
+        handler(context: AzureFunctionContext, timer: any): Promise<void>;
+    }
+
+    // MULTIPART
+    // --------------------------------------------------------------------------------------------
+    export interface MultipartDefaults {
+        bodyHighWaterMark?  : number;
+        fileHighWaterMark?  : number;
+        defaultCharset?     : string;
+        preservePath?       : string;
+        limits?             : MultipartLimits;
+    }
+
+    export interface MultipartConfig {
+        limits?         : MultipartLimits;
+        filter?         : MultipartFilter | MultipartFilter[];
+    }
+
+    export interface MultipartLimits {
+        fieldNameSize?  : number;
+        fieldSize       : number;
+        fields?         : number;
+        fileSize?       : number;
+        files?          : number;
+        parts?          : number;
+        headerPairs?    : number;
+    }
+
+    export interface MultipartFilter {
+        field           : string;
+        maxCount?       : number;
+    }
+
+    // VIEWS
+    // --------------------------------------------------------------------------------------------
+    export interface ViewBuilder {
+        (result: any, options?: any, context?: ViewContext): any;
+    }
+
+    export interface ViewContext {
+        viewer?     : any;
+        timestamp   : number;
+    }
+
+    // AUTHENTICATOR
+    // --------------------------------------------------------------------------------------------
+    export interface Authenticator<T extends OperationContext> {
+        (scope: string, credentials: Credentials, context?: T): Promise<any>;
+    }
+
+    export interface Credentials {
+        readonly type       : string;
+        readonly data       : string;
+    }
+
+    // LOGGER
+    // --------------------------------------------------------------------------------------------
+    export interface TraceSource {
+        name    : string;
+        type    : string;
+    }
+
+    export interface TraceCommand {
+        name    : string;
+        text    : string;
+    }
+
+    export interface Logger {
+
+        readonly operationId    : string;
+        authenticatedUserId?    : string;
+
+        debug(message: string);
+        info(message: string);
+        warn(message: string);
+
+        error(error: Error);
+
+        trace(source: TraceSource, command: TraceCommand, duration: number, success: boolean);
+
+        close(resultCode: number, success: boolean, properties?: { [key: string]: string; });
+    }
+
+    // COMMON INTERFACES
+    // --------------------------------------------------------------------------------------------
+    export interface StringBag {
+        [key: string]: string;
+    }
+
+    export interface CorsOptions {
+        origin      : string;
+        headers     : string[];
+        credentials : string;
+        maxAge      : string;
+    }
+}

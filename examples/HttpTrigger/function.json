@@ -1,0 +1,18 @@
+{
+  "disabled": false,
+  "entryPoint": "handler",
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "request",
+      "route": "HttpTrigger/{*route}"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "$return"
+    }
+  ]
+}

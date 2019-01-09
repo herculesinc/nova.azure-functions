@@ -1,0 +1,12 @@
+{
+  "disabled": false,
+  "entryPoint": "handler",
+  "bindings": [
+    {
+      "name": "myTimer",
+      "type": "timerTrigger",
+      "direction": "in",
+      "schedule": "*/10 * * * * *"
+    }
+  ]
+}

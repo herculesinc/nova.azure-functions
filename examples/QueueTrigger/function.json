@@ -1,0 +1,13 @@
+{
+  "disabled": false,
+  "entryPoint": "handler",
+  "bindings": [
+    {
+      "name": "myQueueItem",
+      "type": "queueTrigger",
+      "direction": "in",
+      "queueName": "test-queue1",
+      "connection": "AzureWebJobsStorage"
+    }
+  ]
+}

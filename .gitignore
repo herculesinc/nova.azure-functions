@@ -1,0 +1,17 @@
+#TypeScript Map Files
+*.map
+
+# Installed modules
+node_modules/
+
+# Compiled Tests
+/bin/tests/
+
+# .npmignore in bin folder
+/bin/.npmignore
+
+# Function Example Files
+/examples/obj/*
+/examples/bin/*
+/examples/extensions.csproj
+/examples/local.settings.json

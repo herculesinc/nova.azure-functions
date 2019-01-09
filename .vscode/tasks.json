@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "setup",
+      "type": "shell",
+      "command": "npm install",
+      "presentation": {
+          "reveal": "always"
+      }
+    },
+    {
+      "label": "build",
+      "type": "gulp",
+      "task": "build",
+      "group": {
+          "kind": "build",
+          "isDefault": true
+      },
+      "presentation": {
+          "reveal": "silent"
+      },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "publish",
+      "type": "gulp",
+      "task": "publish",
+      "presentation": {
+          "reveal": "always"
+      },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "runFunctionsHost",
+      "type": "shell",
+      "command": "func host start --script-root examples",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": "$func-watch",
+      "options": {
+        "env": {
+          "languageWorkers__node__arguments": "--inspect=5858"
+        }
+      },
+      "dependsOn": "installExtensions"
+    },
+    {
+      "label": "installExtensions",
+      "command": "func extensions install",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceRoot}/examples"
+      },
+      "presentation": {
+        "reveal": "always"
+      }
+    }
+  ]
+}
