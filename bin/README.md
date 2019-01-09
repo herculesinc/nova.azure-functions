@@ -4,14 +4,14 @@ Web API framework for Azure Functions written in TypeScript.
 ## Install
 
 ```sh
-$ npm install --save nova-functions
+$ npm install --save @nova/azure-functions
 ```
 
 ## Examples
 
 index.js
 ```JavaScript
-const nova = require('nova-functions');
+const nova = require('@nova/azure-functions');
 const controller = new nova.HttpController();
 
 controller.set('HttpTrigger', '/', {
@@ -60,7 +60,7 @@ function.json
 
 
 ## License
-Copyright (c) 2018 Credo360, Inc.
+Copyright (c) 2019 Credo360, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
