@@ -1,14 +1,43 @@
 declare module "@nova/azure-functions" {
     
-    // IMPORTS
+    // AZURE FUNCTION INTERFACES
     // --------------------------------------------------------------------------------------------
-    import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
-    
+    type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
+
+    export interface AzureFunctionContext {
+        readonly invocationId       : string;
+        readonly executionContext   : any;
+        readonly bindings           : { [key: string]: any; };
+        readonly bindingData?       : any;
+        readonly bindingDefinitions : any;
+        readonly log                : any;
+        done(error?: Error, response?: AzureHttpResponse): void;
+    }
+
+    export interface AzureHttpRequest {
+        
+        readonly method: HttpMethod;
+        readonly url: string;
+        readonly originalUrl: string;
+        readonly headers: { [header: string]: string; };
+        readonly query?: { [param: string]: string; };
+        readonly params?: { [param: string]: string; };
+        readonly body?: object | Buffer | string;
+        readonly rawBody?: string;
+    }
+
+    export interface AzureHttpResponse {
+        readonly status         : number;
+        readonly headers?       : { [header: string] : string; }
+        readonly body?          : object | Buffer;
+        readonly isRaw?         : boolean;    
+    }
+
     // GLOBALS
     // --------------------------------------------------------------------------------------------
     export const symbols: {
-        responseStatus  : Symbol;
-        responseHeaders : Symbol;
+        readonly responseStatus  : Symbol;
+        readonly responseHeaders : Symbol;
     };
 
     export const parsers: {
@@ -118,7 +147,7 @@ declare module "@nova/azure-functions" {
 
         constructor(options?: HttpControllerConfig<T,V>);
 
-        set(functionName: string, path: string, config: HttpEndpointConfig<T,V>);
+        set(functionName: string, path: string, config: HttpRouteConfig<T,V>): void;
 
         handler(context: AzureFunctionContext, request: AzureHttpRequest): Promise<AzureHttpResponse>;
     }

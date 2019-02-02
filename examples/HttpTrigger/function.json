@@ -1,5 +1,6 @@
 {
   "disabled": false,
+  "scriptFile": "../app/routes.js",
   "entryPoint": "handler",
   "bindings": [
     {
