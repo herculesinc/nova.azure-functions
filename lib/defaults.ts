@@ -78,7 +78,7 @@ export const symbols = {
 // =================================================================================================
 function defaultHttpContextAdapter(request: HttpRequestHead, context: AzureFunctionContext, options: any): OperationContextConfig<any> {
     const functionName = context.executionContext.functionName;
-    const operationName = request.method + '/' + functionName + '/' + request.route;
+    const operationName = request.method + ' /' + functionName + request.route;
     return {
         id          : context.invocationId,
         name        : operationName,

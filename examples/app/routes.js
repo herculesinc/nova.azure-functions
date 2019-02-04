@@ -19,7 +19,7 @@ controller.set('HttpTrigger', '/', {
         action  : async (inputs, context) => {
             context.log.info('testing1 testing1 testing1');
             context.log.debug('testing2 testing2 testing2');
-            return { action: 'GET /', inputs };
+            return { action: 'GET /', name: context.name, inputs };
         },
         view    : (result, options, context) => ({ result, options, context })
     },
@@ -43,7 +43,7 @@ controller.set('HttpTrigger', '/', {
                 return {
                     name    : this.name,
                     message : this.message
-                }
+                };
             };
             throw error;
         }
@@ -62,7 +62,13 @@ controller.set('HttpTrigger', '/multipart', {
 
 controller.set('HttpTrigger', '/view', {
     get: {
-        action  : async inputs => ({ action: 'GET /view', inputs }),
+        action  : (inputs, context) => { 
+            return {
+                action  : 'GET /view',
+                name    : context.name,
+                inputs 
+            };
+        },
         view    : (result, options, context) => {
             const view = { result, context };
             view[nova.symbols.responseHeaders] = { 'Test-Header': 'test value' };

@@ -65,43 +65,34 @@ export class HttpController<T extends OperationContext, V> {
         }
 
         route = cleanPath(route); // TODO: test for route conflicts?
-        const corsHeaders = buildCorsHeaders(this.defaults.cors, config.cors);
+        const corsHeaders = buildCorsHeaders(config, this.defaults.cors);
 
-        const methods = ['OPTIONS'];
         router.on('OPTIONS', route, noop, corsHeaders);
 
         if (config.get) {
-            const operationConfig = buildOpConfig('GET', route, config.get, this.defaults);
+            const operationConfig = buildOpConfig('GET', route, config.get, this.defaults, corsHeaders);
             router.on('GET', route, noop, operationConfig);
-            methods.push('GET');
         }
 
         if (config.post) {
-            const operationConfig = buildOpConfig('POST', route, config.post, this.defaults);
+            const operationConfig = buildOpConfig('POST', route, config.post, this.defaults, corsHeaders);
             router.on('POST', route, noop, operationConfig);
-            methods.push('POST');
         }
 
         if (config.put) {
-            const operationConfig = buildOpConfig('PUT', route, config.put, this.defaults);
+            const operationConfig = buildOpConfig('PUT', route, config.put, this.defaults, corsHeaders);
             router.on('PUT', route, noop, operationConfig);
-            methods.push('PUT');
         }
 
         if (config.patch) {
-            const operationConfig = buildOpConfig('PATCH', route, config.patch, this.defaults);
+            const operationConfig = buildOpConfig('PATCH', route, config.patch, this.defaults, corsHeaders);
             router.on('PATCH', route, noop, operationConfig);
-            methods.push('PATCH');
         }
 
         if (config.delete) {
-            const operationConfig = buildOpConfig('DELETE', route, config.delete, this.defaults);
+            const operationConfig = buildOpConfig('DELETE', route, config.delete, this.defaults, corsHeaders);
             router.on('DELETE', route, noop, operationConfig);
-            methods.push('DELETE');
         }
-
-        // set a list of allowed methods for CORS headers
-        corsHeaders["Access-Control-Allow-Methods"] = methods.join(',');
     }
 
     async handler(context: AzureFunctionContext, request: AzureHttpRequest): Promise<AzureHttpResponse> {
@@ -307,11 +298,22 @@ function cleanPath(path: string) {
     return path;
 }
 
-function buildCorsHeaders(defaultCors: CorsOptions, routeCors: CorsOptions) {
+function buildCorsHeaders(config: HttpRouteConfig<any,any>, defaultCors: CorsOptions) {
 
-    const cors = {...defaultCors, ...routeCors};
+    // merge default and rout CORS
+    const cors = { ...defaultCors, ...config.cors };
+
+    // determine allowed methods
+    const methods = ['OPTIONS'];
+    if (config.get)     methods.push('GET');
+    if (config.post)    methods.push('POST');
+    if (config.put)     methods.push('PUT');
+    if (config.patch)   methods.push('PATCH');
+    if (config.delete)  methods.push('DELETE');
+
+    // build and return CORS headers
     return {
-        'Access-Control-Allow-Methods'      : undefined,
+        'Access-Control-Allow-Methods'      : methods.join(','),
         'Access-Control-Allow-Origin'       : cors.origin,
         'Access-Control-Allow-Headers'      : cors.headers.join(','),
         'Access-Control-Allow-Credentials'  : cors.credentials,
@@ -319,15 +321,15 @@ function buildCorsHeaders(defaultCors: CorsOptions, routeCors: CorsOptions) {
     };
 }
 
-function buildOpConfig(method: string, path: string, config: HttpEndpointConfig<any,any>, defaults: HttpEndpointDefaults<any>): OperationConfig<any, any> {
+function buildOpConfig(method: string, path: string, config: HttpEndpointConfig<any,any>, defaults: HttpEndpointDefaults<any>, cors: StringBag): OperationConfig<any, any> {
 
     // determine view
     const view = config.view === undefined ? defaults.view : config.view;
 
     // build headers
-    let headers = undefined;
+    let headers = cors;
     if (view) {
-        headers = { 'Content-Type': 'application/json' };
+        headers = { ...headers, 'Content-Type': 'application/json' };
     }
 
     // validate and build actions

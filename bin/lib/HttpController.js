@@ -25,36 +25,28 @@ class HttpController {
             this.routers.set(functionName, router);
         }
         route = cleanPath(route); // TODO: test for route conflicts?
-        const corsHeaders = buildCorsHeaders(this.defaults.cors, config.cors);
-        const methods = ['OPTIONS'];
+        const corsHeaders = buildCorsHeaders(config, this.defaults.cors);
         router.on('OPTIONS', route, noop, corsHeaders);
         if (config.get) {
-            const operationConfig = buildOpConfig('GET', route, config.get, this.defaults);
+            const operationConfig = buildOpConfig('GET', route, config.get, this.defaults, corsHeaders);
             router.on('GET', route, noop, operationConfig);
-            methods.push('GET');
         }
         if (config.post) {
-            const operationConfig = buildOpConfig('POST', route, config.post, this.defaults);
+            const operationConfig = buildOpConfig('POST', route, config.post, this.defaults, corsHeaders);
             router.on('POST', route, noop, operationConfig);
-            methods.push('POST');
         }
         if (config.put) {
-            const operationConfig = buildOpConfig('PUT', route, config.put, this.defaults);
+            const operationConfig = buildOpConfig('PUT', route, config.put, this.defaults, corsHeaders);
             router.on('PUT', route, noop, operationConfig);
-            methods.push('PUT');
         }
         if (config.patch) {
-            const operationConfig = buildOpConfig('PATCH', route, config.patch, this.defaults);
+            const operationConfig = buildOpConfig('PATCH', route, config.patch, this.defaults, corsHeaders);
             router.on('PATCH', route, noop, operationConfig);
-            methods.push('PATCH');
         }
         if (config.delete) {
-            const operationConfig = buildOpConfig('DELETE', route, config.delete, this.defaults);
+            const operationConfig = buildOpConfig('DELETE', route, config.delete, this.defaults, corsHeaders);
             router.on('DELETE', route, noop, operationConfig);
-            methods.push('DELETE');
         }
-        // set a list of allowed methods for CORS headers
-        corsHeaders["Access-Control-Allow-Methods"] = methods.join(',');
     }
     async handler(context, request) {
         // check if the route is registered
@@ -244,23 +236,37 @@ function cleanPath(path) {
     }
     return path;
 }
-function buildCorsHeaders(defaultCors, routeCors) {
-    const cors = Object.assign({}, defaultCors, routeCors);
+function buildCorsHeaders(config, defaultCors) {
+    // merge default and rout CORS
+    const cors = Object.assign({}, defaultCors, config.cors);
+    // determine allowed methods
+    const methods = ['OPTIONS'];
+    if (config.get)
+        methods.push('GET');
+    if (config.post)
+        methods.push('POST');
+    if (config.put)
+        methods.push('PUT');
+    if (config.patch)
+        methods.push('PATCH');
+    if (config.delete)
+        methods.push('DELETE');
+    // build and return CORS headers
     return {
-        'Access-Control-Allow-Methods': undefined,
+        'Access-Control-Allow-Methods': methods.join(','),
         'Access-Control-Allow-Origin': cors.origin,
         'Access-Control-Allow-Headers': cors.headers.join(','),
         'Access-Control-Allow-Credentials': cors.credentials,
         'Access-Control-Max-Age': cors.maxAge
     };
 }
-function buildOpConfig(method, path, config, defaults) {
+function buildOpConfig(method, path, config, defaults, cors) {
     // determine view
     const view = config.view === undefined ? defaults.view : config.view;
     // build headers
-    let headers = undefined;
+    let headers = cors;
     if (view) {
-        headers = { 'Content-Type': 'application/json' };
+        headers = Object.assign({}, headers, { 'Content-Type': 'application/json' });
     }
     // validate and build actions
     const actions = [];

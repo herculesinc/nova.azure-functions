@@ -58,7 +58,7 @@ exports.symbols = {
 // =================================================================================================
 function defaultHttpContextAdapter(request, context, options) {
     const functionName = context.executionContext.functionName;
-    const operationName = request.method + '/' + functionName + '/' + request.route;
+    const operationName = request.method + ' /' + functionName + request.route;
     return {
         id: context.invocationId,
         name: operationName,
