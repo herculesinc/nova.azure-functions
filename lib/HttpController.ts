@@ -43,13 +43,15 @@ export class HttpController<T extends OperationContext, V> {
     private readonly executor   : Executor<T,V>;
     private readonly defaults   : HttpEndpointDefaults<T>;
 
-    private readonly routerOptions  : Router.RouterConfig;
+    private readonly routerOptions      : Router.RouterConfig;
+    private readonly rethrowThreshold   : number;
 
     constructor(options?: HttpControllerConfig<T,V>) {
         options = processOptions(options);
 
         this.routers = new Map();
         this.routerOptions = options.routerOptions;
+        this.rethrowThreshold = options.rethrowThreshold;
 
         this.adapter = options.adapter;
         this.executor = options.executor;
@@ -219,13 +221,8 @@ export class HttpController<T extends OperationContext, V> {
         }
         catch(error) {
 
-            // if not a server error - build an error response
-            let response: AzureHttpResponse;
-            if (error.status < HttpStatusCode.InternalServerError) {
-                const body = error.toJSON ? error.toJSON() : null;
-                const headers = { ...opConfig, ...error.headers, 'Content-Type': (body ? 'application/json' : null) };
-                response = { status: error.status, headers, body };
-            }
+            // determine error status
+            const status = error.status || HttpStatusCode.InternalServerError;
 
             // if the context has been created - use it to log errors
             if (opContext) {
@@ -238,24 +235,25 @@ export class HttpController<T extends OperationContext, V> {
                     }
                     catch (closingError) {
                         opContext.log.error(closingError);
-                        response = undefined;
                     }
                 }
 
-                // if there is a response to return, don't throw an error
-                if (response) {
-                    opContext.log.close(response.status, false);
-                    return response;
-                }
-                else {
-                    opContext.log.close(HttpStatusCode.InternalServerError, false);
-                    throw error;
-                }
+                // mark the request as closed
+                opContext.log.close(status, false);
+            }
+
+            // if the error is over the threshold, throw it
+            if (status > this.rethrowThreshold) {
+                throw error;
             }
             else {
-                // context wasn't even created
-                if (response)   return response;
-                else            throw error;
+                // otherwise, return an error response
+                const headers = { ...opConfig.headers, ...error.headers, 'Content-Type': 'application/json' };
+                const body = error.toJSON
+                    ? error.toJSON()
+                    : { name: error.name, message: error.message };
+            
+                return { status, headers, body };
             }
         }
     }
@@ -270,6 +268,7 @@ function processOptions(options: HttpControllerConfig<any,any>): HttpControllerC
         adapter         : options.adapter || defaults.httpController.adapter,
         executor        : options.executor || defaults.httpController.executor,
         routerOptions   : options.routerOptions,
+        rethrowThreshold: options.rethrowThreshold || defaults.httpController.rethrowThreshold,
         defaults        : undefined,
     };
 

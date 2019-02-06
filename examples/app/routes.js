@@ -37,7 +37,7 @@ controller.set('HttpTrigger', '/', {
             context.log.warn('Warning text');
             context.log.error(new Error('Error message'));
 
-            const error = new Error('Boom PUT!');
+            const error = new Error('Boom 400!');
             error.status = 400;
             error.toJSON = function() {
                 return {
@@ -49,7 +49,17 @@ controller.set('HttpTrigger', '/', {
         }
     },
     patch: {
-        action  : function(inputs) { throw new Error('Boom!'); }
+        action  : function(inputs) { 
+            const error = new Error('Boom 500!');
+            error.status = 500;
+            error.toJSON = function() {
+                return {
+                    name    : this.name,
+                    message : this.message
+                };
+            };
+            throw error;
+         }
     }
 });
 

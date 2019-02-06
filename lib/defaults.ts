@@ -28,6 +28,7 @@ export const defaults: Defaults = {
             closeContext    : defaultContextCloser,
             execute         : defaultActionExecutor
         },
+        rethrowThreshold    : 500,
         defaults: {
             cors: {
                 origin      : '*',

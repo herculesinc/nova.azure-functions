@@ -10,6 +10,7 @@ exports.defaults = {
             closeContext: defaultContextCloser,
             execute: defaultActionExecutor
         },
+        rethrowThreshold: 500,
         defaults: {
             cors: {
                 origin: '*',

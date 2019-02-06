@@ -77,10 +77,11 @@ declare module "@nova/azure-functions" {
     // HTTP CONTROLLER
     // --------------------------------------------------------------------------------------------
     export interface HttpControllerConfig<T extends OperationContext, V> {
-        adapter?        : HttpRequestAdapter<V>;
-        executor?       : Executor<T, V>;
-        routerOptions?  : HttpRouterConfig;
-        defaults?       : HttpEndpointDefaults<T>;
+        adapter?            : HttpRequestAdapter<V>;
+        executor?           : Executor<T, V>;
+        routerOptions?      : HttpRouterConfig;
+        rethrowThreshold?   : number;
+        defaults?           : HttpEndpointDefaults<T>;
     }
 
     export interface HttpRouterConfig {

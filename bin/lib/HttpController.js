@@ -14,6 +14,7 @@ class HttpController {
         options = processOptions(options);
         this.routers = new Map();
         this.routerOptions = options.routerOptions;
+        this.rethrowThreshold = options.rethrowThreshold;
         this.adapter = options.adapter;
         this.executor = options.executor;
         this.defaults = options.defaults;
@@ -159,13 +160,8 @@ class HttpController {
             return response;
         }
         catch (error) {
-            // if not a server error - build an error response
-            let response;
-            if (error.status < 500 /* InternalServerError */) {
-                const body = error.toJSON ? error.toJSON() : null;
-                const headers = Object.assign({}, opConfig, error.headers, { 'Content-Type': (body ? 'application/json' : null) });
-                response = { status: error.status, headers, body };
-            }
+            // determine error status
+            const status = error.status || 500 /* InternalServerError */;
             // if the context has been created - use it to log errors
             if (opContext) {
                 opContext.log.error(error);
@@ -176,25 +172,22 @@ class HttpController {
                     }
                     catch (closingError) {
                         opContext.log.error(closingError);
-                        response = undefined;
                     }
                 }
-                // if there is a response to return, don't throw an error
-                if (response) {
-                    opContext.log.close(response.status, false);
-                    return response;
-                }
-                else {
-                    opContext.log.close(500 /* InternalServerError */, false);
-                    throw error;
-                }
+                // mark the request as closed
+                opContext.log.close(status, false);
+            }
+            // if the error is over the threshold, throw it
+            if (status > this.rethrowThreshold) {
+                throw error;
             }
             else {
-                // context wasn't even created
-                if (response)
-                    return response;
-                else
-                    throw error;
+                // otherwise, return an error response
+                const headers = Object.assign({}, opConfig.headers, error.headers, { 'Content-Type': 'application/json' });
+                const body = error.toJSON
+                    ? error.toJSON()
+                    : { name: error.name, message: error.message };
+                return { status, headers, body };
             }
         }
     }
@@ -209,6 +202,7 @@ function processOptions(options) {
         adapter: options.adapter || defaults_1.defaults.httpController.adapter,
         executor: options.executor || defaults_1.defaults.httpController.executor,
         routerOptions: options.routerOptions,
+        rethrowThreshold: options.rethrowThreshold || defaults_1.defaults.httpController.rethrowThreshold,
         defaults: undefined,
     };
     if (options.defaults) {
