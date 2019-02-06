@@ -5,5 +5,10 @@
       "Function.HttpTrigger": "trace",
       "default": "information"
     }
+  },
+  "extensions": {
+    "http": {
+      "routePrefix": ""
+    }
   }
 }

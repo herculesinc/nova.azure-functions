@@ -8,7 +8,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "request",
-      "route": "HttpTrigger/{*route}"
+      "route": "{*route}"
     },
     {
       "type": "http",
