@@ -2,8 +2,9 @@
 // =================================================================================================
 import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
 import { 
-    Action, OperationContext, Executor, Authenticator, ViewBuilder, HttpRequestAdapter, HttpBodyParser, HttpInputProcessor,
-    HttpControllerConfig, HttpRouteConfig, HttpEndpointConfig, HttpEndpointDefaults, CorsOptions, StringBag
+    Action, OperationContext, Executor, HttpControllerConfig, HttpRequestAdapter,
+    HttpRouteConfig, HttpEndpointConfig, HttpEndpointDefaults, CorsOptions,
+    Authenticator, HttpInputParser, HttpInputValidator, HttpInputMutator, ViewBuilder, StringBag
 } from '@nova/azure-functions';
 import * as Router from 'find-my-way';
 import * as typeIs from 'type-is';
@@ -19,13 +20,14 @@ const JSON_CONTENT = ['application/json'];
 interface OperationConfig<T extends OperationContext, V> {
     method          : string;
     path            : string;
-    scope           : string,
+    scope           : string;
     headers         : StringBag;
     options         : V;
     defaults        : object;
-    parser          : HttpBodyParser<T>;
-    processor       : HttpInputProcessor;
+    parser          : HttpInputParser<T>;
+    validator       : HttpInputValidator;
     authenticator   : Authenticator<T>;
+    mutator         : HttpInputMutator<T>;
     actions         : Action[];
     view            : ViewBuilder;
 }
@@ -137,53 +139,62 @@ export class HttpController<T extends OperationContext, V> {
             const opContextConfig = this.adapter(reqHead, context, opConfig.options);
             opContext = await this.executor.createContext(opContextConfig);
 
-            // 2 ----- parse request body
-            let body = undefined;
+            // 2 ----- transform request into inputs object
+            let inputs = undefined;
             if (opConfig.parser) {
-                body = await opConfig.parser(request, opContext);
-                if (typeof body !== 'object') throw new Error('Invalid value received from body parser');
-            }
-            else if (request.body) {
-                const contentType = request.headers['content-type'] || request.headers['Content-Type'];
-                if (typeIs.is(contentType, JSON_CONTENT)) {
-                    body = request.body;
-                }
-                else {
-                    // content type not supported - return error
-                    return defaults.invalidContentResponse;
-                }
-            }
-
-            // 3 ----- build action inputs and view options
-            let actionInputs = undefined, viewOptions = undefined;
-            if (opConfig.processor) {
-                const result = opConfig.processor(body, request.query, route.params, opConfig.defaults);
-                actionInputs = result.action;
-                viewOptions = result.view;
+                inputs = await opConfig.parser(request, opConfig.defaults, route.params, opContext);
+                if (typeof inputs !== 'object') throw new Error('Invalid value received from input parser');
             }
             else {
-                actionInputs = { ...opConfig.defaults, ...request.query, ...route.params, ...body };
+                let body = undefined;
+                if (request.body) {
+                    const contentType = request.headers['content-type'] || request.headers['Content-Type'];
+                    if (typeIs.is(contentType, JSON_CONTENT)) {
+                        body = request.body;
+                    }
+                    else {
+                        // content type not supported - return error
+                        return defaults.invalidContentResponse;
+                    }
+                }
+                inputs = { ...opConfig.defaults, ...request.query, ...route.params, ...body };
+            }
+
+            // 3 ----- validate inputs object
+            if (opConfig.validator) {
+                inputs = opConfig.validator(inputs);
             }
 
             // 4 ----- authenticate the request
-            let requestor = undefined;
+            let auth = undefined;
             if (opConfig.authenticator) {
                 const credentials = util.parseAuthHeader(request.headers);
                 if (credentials === null) {
                     // auth header could not be parsed
                     return defaults.invalidAuthHeaderResponse;
                 }
-                requestor = await opConfig.authenticator(opConfig.scope, credentials, opContext); 
+                auth = await opConfig.authenticator(opConfig.scope, credentials, opContext); 
             }
 
-            // 5 ----- execute actions
+            // 5 ----- split inputs into action inputs and view options
+            let actionInputs = undefined, viewOptions = undefined;
+            if (opConfig.mutator) {
+                const result = await opConfig.mutator(inputs, auth, opContext);
+                actionInputs = result.action;
+                viewOptions = result.view;
+            }
+            else {
+                actionInputs = inputs;
+            }            
+
+            // 6 ----- execute actions
             const result = await this.executor.execute(opConfig.actions, actionInputs, opContext);
             executed = true;
 
-            // 6 ------ close the context
+            // 7 ------ close the context
             await this.executor.closeContext(opContext);
 
-            // 7 ----- build the response
+            // 8 ----- build the response
             let response: AzureHttpResponse;
             if (!result || !opConfig.view) {
                 response = {
@@ -195,7 +206,7 @@ export class HttpController<T extends OperationContext, V> {
             else {
 
                 const view = opConfig.view(result, viewOptions, {
-                    viewer      : requestor,
+                    viewer      : auth,
                     timestamp   : opContext.timestamp
                 });
 
@@ -215,7 +226,7 @@ export class HttpController<T extends OperationContext, V> {
                 }
             }
 
-            // 8 ----- log the request and return the result
+            // 9 ----- log the request and return the result
             opContext.log.close(response.status, true);
             return response;
         }
@@ -362,9 +373,10 @@ function buildOpConfig(method: string, path: string, config: HttpEndpointConfig<
         headers         : headers,
         options         : config.options,
         defaults        : { ...defaults.inputs, ...config.defaults },
-        parser          : config.body,
-        processor       : config.inputs,
+        parser          : config.inputs,
+        validator       : config.schema,    // TODO: check defaults?
         authenticator   : config.auth === undefined ? defaults.auth : config.auth,
+        mutator         : config.mutator,   // TODO: check defaults?
         actions         : actions,
         view            : view
     };

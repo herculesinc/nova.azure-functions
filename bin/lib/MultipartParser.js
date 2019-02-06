@@ -10,13 +10,13 @@ function buildParser(options) {
     options = options || defaults_1.defaults.multipartParser;
     const filters = buildFilters(options.filter);
     const busboyConfig = buildBusboyConfig(options);
-    return function (request, context) {
+    return function (request, params, defaults, context) {
         return new Promise((resolve, reject) => {
             let errorOccurred = false;
             // TODO: validate that body is a buffer
             const options = Object.assign({}, busboyConfig, { headers: request.headers });
             const busboy = new Busboy(options);
-            const body = {};
+            const inputs = Object.assign({}, defaults, request.query, params);
             const fileCounts = {};
             // parse incoming files
             busboy.on('file', (fieldName, fileStream, fileName, encoding, mimeType) => {
@@ -42,9 +42,9 @@ function buildParser(options) {
                 }
                 fileCounts[fieldName] = fileCount = fileCount + 1;
                 // prepare the field
-                let fieldContent = body[fieldName];
+                let fieldContent = inputs[fieldName];
                 if (!fieldContent || !Array.isArray(fieldContent)) {
-                    body[fieldName] = fieldContent = [];
+                    inputs[fieldName] = fieldContent = [];
                 }
                 let buffer = undefined;
                 fileStream.on('data', (data) => {
@@ -70,7 +70,7 @@ function buildParser(options) {
                     // TODO: throw error
                 }
                 else {
-                    body[fieldName] = fieldValue;
+                    inputs[fieldName] = fieldValue;
                 }
             });
             busboy.on('finish', () => {
@@ -80,14 +80,14 @@ function buildParser(options) {
                 if (filters) {
                     for (let [fieldName, maxCount] of filters.entries()) {
                         if (maxCount === 1) {
-                            let fieldContent = body[fieldName];
+                            let fieldContent = inputs[fieldName];
                             if (fieldContent && fieldContent.length === 1) {
-                                body[fieldName] = fieldContent[0];
+                                inputs[fieldName] = fieldContent[0];
                             }
                         }
                     }
                 }
-                resolve(body);
+                resolve(inputs);
             });
             busboy.on('error', abortWithError);
             busboy.on('partsLimit', () => abortWithError(new Error(errors.partCountExceeded)));

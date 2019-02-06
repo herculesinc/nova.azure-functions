@@ -13,7 +13,7 @@ export function buildParser(options?: MultipartConfig) {
     const filters = buildFilters(options.filter);
     const busboyConfig = buildBusboyConfig(options);
 
-    return function(request: AzureHttpRequest, context: OperationContext) {
+    return function(request: AzureHttpRequest, params: object, defaults: object, context: OperationContext) {
         return new Promise((resolve, reject) => {
 
             let errorOccurred = false;
@@ -22,7 +22,7 @@ export function buildParser(options?: MultipartConfig) {
             const options = { ...busboyConfig, headers: request.headers };
             const busboy = new Busboy(options);
     
-            const body: {[key: string]: any; } = {};
+            const inputs: {[key: string]: any; } = { ...defaults, ...request.query, ...params };
             const fileCounts: {[key: string]: number; } = {};
     
             // parse incoming files
@@ -53,9 +53,9 @@ export function buildParser(options?: MultipartConfig) {
                 fileCounts[fieldName] = fileCount = fileCount + 1;
 
                 // prepare the field
-                let fieldContent = body[fieldName];
+                let fieldContent = inputs[fieldName];
                 if (!fieldContent || !Array.isArray(fieldContent)) {
-                    body[fieldName] = fieldContent = [];
+                    inputs[fieldName] = fieldContent = [];
                 }
 
                 let buffer: Buffer = undefined;
@@ -87,7 +87,7 @@ export function buildParser(options?: MultipartConfig) {
                     // TODO: throw error
                 }
                 else {
-                    body[fieldName] = fieldValue;
+                    inputs[fieldName] = fieldValue;
                 }
             });
     
@@ -98,15 +98,15 @@ export function buildParser(options?: MultipartConfig) {
                 if (filters) {
                     for (let [fieldName, maxCount] of filters.entries()) {
                         if (maxCount === 1) {
-                            let fieldContent = body[fieldName];
+                            let fieldContent = inputs[fieldName];
                             if (fieldContent && fieldContent.length === 1) {
-                                body[fieldName] = fieldContent[0];
+                                inputs[fieldName] = fieldContent[0];
                             }
                         }
                     }
                 }
 
-                resolve(body);
+                resolve(inputs);
             });
 
             busboy.on('error', abortWithError);

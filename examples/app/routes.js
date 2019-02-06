@@ -12,13 +12,16 @@ module.exports = controller;
 controller.set('HttpTrigger', '/', {
     get: {
         scope   : 'account:read',
-        inputs  : (body, query, params, defaults) => ({
-            action  : { ...defaults, ...query, ...params, ...body },
-            view    : { include: query.include }
+        auth    : async (scope, credentials) => {
+            if (credentials) {
+                return credentials.data;
+            }
+        },
+        mutator : (inputs, auth) => ({
+            action  : { ...inputs, auth },
+            view    : { include: inputs.include }
         }),
         action  : async (inputs, context) => {
-            context.log.info('testing1 testing1 testing1');
-            context.log.debug('testing2 testing2 testing2');
             return { action: 'GET /', name: context.name, inputs };
         },
         view    : (result, options, context) => ({ result, options, context })
@@ -49,7 +52,7 @@ controller.set('HttpTrigger', '/', {
         }
     },
     patch: {
-        action  : function(inputs) { 
+        action  : async function(inputs) { 
             const error = new Error('Boom 500!');
             error.status = 500;
             error.toJSON = function() {
@@ -65,7 +68,7 @@ controller.set('HttpTrigger', '/', {
 
 controller.set('HttpTrigger', '/multipart', {
     post: {
-        body    : nova.parsers.multipart({ filter: { field: 'field3', maxCount: 1 }}),
+        inputs  : nova.parsers.multipart({ filter: { field: 'field3', maxCount: 1 }}),
         action  : async inputs => ({ action: 'POST /multipart', inputs })
     }
 });
