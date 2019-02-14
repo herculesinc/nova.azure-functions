@@ -12,8 +12,8 @@ let counter = 0;
 // TIMER HANDLERS
 // =================================================================================================
 controller.set('TimerTrigger', {
-    action  : async (inputs, context) => {
+    action  : async function (inputs) {
         counter++;
-        context.log.info(counter);
+        this.log.info(counter);
     }
 });

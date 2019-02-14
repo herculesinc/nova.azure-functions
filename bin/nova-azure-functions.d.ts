@@ -1,5 +1,10 @@
 declare module "@nova/azure-functions" {
     
+    // IMPORTS AND RE-EXPORTS
+    // --------------------------------------------------------------------------------------------
+    import { Executable, Context, Action } from '@nova/core';
+    export { Operation, Action, Logger, TraceSource, TraceCommand } from '@nova/core';
+
     // AZURE FUNCTION INTERFACES
     // --------------------------------------------------------------------------------------------
     type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
@@ -41,47 +46,16 @@ declare module "@nova/azure-functions" {
     };
 
     export const parsers: {
-        multipart       : HttpInputParser<OperationContext>;
+        multipart       : HttpInputParser;
     };
-
-    // EXECUTOR
-    // --------------------------------------------------------------------------------------------
-    export interface Executor <T extends OperationContext, V> {
-        
-        createContext(options: OperationContextConfig<V>): Promise<T>;
-        closeContext(context: T, error?: Error): Promise<void>;
-
-        execute(actions: Action[], inputs: any, context?: T): Promise<any>;
-    }
-    
-    export interface Action {
-        (inputs: any, context?: OperationContext): Promise<any>
-    }
-
-    export interface OperationContext {
-        readonly id         : string;
-        readonly name       : string;
-        readonly origin     : string;
-        readonly timestamp  : number;
-        readonly log        : Logger;
-    }
-
-    export interface OperationContextConfig<V> {
-        readonly id         : string;
-        readonly name       : string;
-        readonly origin     : string;
-        readonly logger     : Logger;
-        readonly options?   : V;
-    }
 
     // HTTP CONTROLLER
     // --------------------------------------------------------------------------------------------
-    export interface HttpControllerConfig<T extends OperationContext, V> {
-        adapter?            : HttpRequestAdapter<V>;
-        executor?           : Executor<T, V>;
+    export interface HttpControllerConfig {
+        adapter?            : HttpOperationAdapter;
         routerOptions?      : HttpRouterConfig;
         rethrowThreshold?   : number;
-        defaults?           : HttpEndpointDefaults<T>;
+        defaults?           : HttpEndpointDefaults;
     }
 
     export interface HttpRouterConfig {
@@ -90,8 +64,8 @@ declare module "@nova/azure-functions" {
         allowUnsafeRegex?       : boolean;
     }
 
-    export interface HttpRequestAdapter<V> {
-        (request: HttpRequestHead, context: AzureFunctionContext, options?: V): OperationContextConfig<V>;
+    export interface HttpOperationAdapter {
+        (context: AzureFunctionContext, request: HttpRequestHead, actions: Action[], options?: any): Executable & Context;
     }
 
     export interface HttpRequestHead {
@@ -102,46 +76,46 @@ declare module "@nova/azure-functions" {
         url         : string;
     }
 
-    export interface HttpEndpointDefaults<T extends OperationContext> {
+    export interface HttpEndpointDefaults {
         scope?      : string;
         cors?       : CorsOptions;
         inputs?     : object;
-        auth?       : Authenticator<T>;
+        auth?       : Authenticator;
         view?       : ViewBuilder;
     }
 
-    export interface HttpRouteConfig<T extends OperationContext, V> {
-        get?    : HttpEndpointConfig<T,V>;
-        post?   : HttpEndpointConfig<T,V>;
-        put?    : HttpEndpointConfig<T,V>;
-        patch?  : HttpEndpointConfig<T,V>;
-        delete? : HttpEndpointConfig<T,V>;
+    export interface HttpRouteConfig {
+        get?    : HttpEndpointConfig;
+        post?   : HttpEndpointConfig;
+        put?    : HttpEndpointConfig;
+        patch?  : HttpEndpointConfig;
+        delete? : HttpEndpointConfig;
         cors?   : CorsOptions;
     }
 
-    export interface HttpEndpointConfig<T extends OperationContext, V> {
+    export interface HttpEndpointConfig {
         scope?      : string;
-        options?    : V;
-        defaults?   : object;
-        inputs?     : HttpInputParser<T>;
+        options?    : any;
+        defaults?   : any;
+        inputs?     : HttpInputParser;
         schema?     : HttpInputValidator;
-        auth?       : Authenticator<T>;
-        mutator?    : HttpInputMutator<T>;
+        auth?       : Authenticator;
+        mutator?    : HttpInputMutator;
         action?     : Action;
         actions?    : Action[];
         view?       : ViewBuilder;
     }
 
-    export interface HttpInputParser<T extends OperationContext> {
-        (request: AzureHttpRequest, params?: object, defaults?: object, context?: T): Promise<object>;
+    export interface HttpInputParser {
+        (this: Context, request: AzureHttpRequest, params?: any, defaults?: any): Promise<object>;
     }
 
     export interface HttpInputValidator {
         (inputs: object): object;
     }
 
-    export interface HttpInputMutator<T extends OperationContext> {
-        (inputs: object, auth?: any, context?: T): Promise<HttpInputMutatorResult>;
+    export interface HttpInputMutator {
+        (this: Context, inputs: any, auth?: any): Promise<HttpInputMutatorResult>;
     }
 
     export interface HttpInputMutatorResult {
@@ -149,29 +123,28 @@ declare module "@nova/azure-functions" {
         view?   : object;
     }
 
-    export class HttpController<T extends OperationContext, V> {
+    export class HttpController {
 
-        constructor(options?: HttpControllerConfig<T,V>);
+        constructor(options?: HttpControllerConfig);
 
-        set(functionName: string, path: string, config: HttpRouteConfig<T,V>): void;
+        set(functionName: string, path: string, config: HttpRouteConfig): void;
 
         handler(context: AzureFunctionContext, request: AzureHttpRequest): Promise<AzureHttpResponse>;
     }
 
     // QUEUE CONTROLLER
     // --------------------------------------------------------------------------------------------
-    export interface QueueControllerConfig<T extends OperationContext, V> {
-        adapter?    : QueueAdapter<V>;
-        executor?   : Executor<T, V>;
+    export interface QueueControllerConfig {
+        adapter?    : QueueOperationAdapter;
     }
 
-    export interface QueueAdapter<V> {
-        (context: AzureFunctionContext, options?: V): OperationContextConfig<V>;
+    export interface QueueOperationAdapter {
+        (context: AzureFunctionContext, actions: Action[], options?: any): Executable & Context;
     }
 
-    export interface QueueTaskConfig<T extends OperationContext, V> {
-        options?    : V;
-        defaults?   : object;
+    export interface QueueTaskConfig {
+        options?    : any;
+        defaults?   : any;
         inputs?     : QueueInputProcessor;
         action?     : Action;
         actions?    : Action[];
@@ -190,38 +163,37 @@ declare module "@nova/azure-functions" {
         popReceipt      : string;
     }
 
-    export class QueueController<T extends OperationContext, V> {
+    export class QueueController {
 
-        constructor(options?: QueueControllerConfig<T,V>);
+        constructor(options?: QueueControllerConfig);
 
-        set(functionName: string, taskConfig: QueueTaskConfig<T,V>) : void;
+        set(functionName: string, taskConfig: QueueTaskConfig) : void;
 
-        handler(context: AzureFunctionContext, message: object): Promise<void>;
+        handler(context: AzureFunctionContext, message: any): Promise<void>;
     }
 
     // TIMER CONTROLLER
     // --------------------------------------------------------------------------------------------
-    export interface TimerControllerConfig<T extends OperationContext, V> {
-        adapter?    : TimerAdapter<V>;
-        executor?   : Executor<T, V>;
+    export interface TimerControllerConfig {
+        adapter?    : TimerOperationAdapter;
     }
 
-    export interface TimerAdapter<V> {
-        (context: AzureFunctionContext, options?: V): OperationContextConfig<V>;
+    export interface TimerOperationAdapter {
+        (context: AzureFunctionContext, actions: Action[], options?: any): Executable & Context;
     }
 
-    export interface TimerHandlerConfig<T extends OperationContext, V> {
-        options?    : V;
-        defaults?   : object;
+    export interface TimerHandlerConfig {
+        options?    : any;
+        defaults?   : any;
         action?     : Action;
         actions?    : Action[];
     }
 
-    export class TimerController<T extends OperationContext, V> {
+    export class TimerController {
 
-        constructor(options?: TimerControllerConfig<T,V>);
+        constructor(options?: TimerControllerConfig);
 
-        set(timerConfig: TimerHandlerConfig<T,V>);
+        set(timerConfig: TimerHandlerConfig);
 
         handler(context: AzureFunctionContext, timer: any): Promise<void>;
     }
@@ -269,41 +241,13 @@ declare module "@nova/azure-functions" {
 
     // AUTHENTICATOR
     // --------------------------------------------------------------------------------------------
-    export interface Authenticator<T extends OperationContext> {
-        (scope: string, credentials: Credentials, context?: T): Promise<any>;
+    export interface Authenticator {
+        (this: Context, scope: string, credentials: Credentials): Promise<any>;
     }
 
     export interface Credentials {
         readonly type       : string;
         readonly data       : string;
-    }
-
-    // LOGGER
-    // --------------------------------------------------------------------------------------------
-    export interface TraceSource {
-        readonly name   : string;
-        readonly type   : string;
-    }
-
-    export interface TraceCommand {
-        readonly name   : string;
-        readonly text   : string;
-    }
-
-    export interface Logger {
-
-        readonly operationId    : string;
-        authenticatedUserId?    : string;
-
-        debug(message: string)  : void;
-        info(message: string)   : void;
-        warn(message: string)   : void;
-
-        error(error: Error)     : void;
-
-        trace(source: TraceSource, command: TraceCommand, duration: number, success: boolean): void;
-
-        close(resultCode: number, success: boolean, properties?: StringBag): void;
     }
 
     // COMMON INTERFACES
@@ -317,5 +261,35 @@ declare module "@nova/azure-functions" {
         headers     : string[];
         credentials : string;
         maxAge      : string;
+    }
+}
+
+declare module '@nova/core' {
+
+    export interface TraceSource {
+        readonly name   : string;
+        readonly type   : string;
+    }
+
+    export interface TraceCommand {
+        readonly name   : string;
+        readonly text?  : string;
+    }
+
+    export interface Logger {
+
+        readonly operationId    : string;
+        authenticatedUserId?    : string;
+
+        debug(message: string)  : void;
+        info(message: string)   : void;
+        warn(message: string)   : void;
+
+        error(error: Error)     : void;
+
+        trace(source: TraceSource, command: string, duration: number, success: boolean): void;
+        trace(source: TraceSource, command: TraceCommand, duration: number, success: boolean): void;
+
+        close(resultCode: number, success: boolean, properties?: { [key: string]: string; } ): void;
     }
 }

@@ -8,7 +8,6 @@ class TimerController {
         options = processOptions(options);
         this.handlers = new Map();
         this.adapter = options.adapter;
-        this.executor = options.executor;
     }
     set(functionName, taskConfig) {
         if (this.handlers.has(functionName)) {
@@ -24,24 +23,21 @@ class TimerController {
         if (!opConfig) {
             throw new Error(`Task handler for '${functionName}' could not be found`);
         }
-        let executed = false;
-        let opContext = undefined;
+        let operation = undefined;
         try {
-            // 1 ----- create operation context
-            const opContextConfig = this.adapter(context, opConfig.options);
-            opContext = await this.executor.createContext(opContextConfig);
+            // 1 ----- create operation
+            operation = this.adapter(context, opConfig.actions, opConfig.options);
             // 2 ----- execute actions
-            const result = await this.executor.execute(opConfig.actions, undefined, opContext);
-            executed = true;
-            // 3 ------ close the context
-            await this.executor.closeContext(opContext);
-            // return the result
+            const result = await operation.execute(undefined);
+            // 3 ----- log the operation and return the result
+            operation.log.close(201, true); // TODO: set status to something else?
             return result;
         }
         catch (error) {
-            // if the context hasn't been closed yet - close it
-            if (opContext && !executed) {
-                await this.executor.closeContext(opContext, error);
+            // if the operation has been created - use it to log errors
+            if (operation) {
+                operation.log.error(error);
+                operation.log.close(500, false); // TODO: set status to something else?
             }
             throw error;
         }
@@ -53,9 +49,8 @@ exports.TimerController = TimerController;
 function processOptions(options) {
     if (!options)
         return defaults_1.defaults.timerController;
-    let newOptions = {
-        adapter: options.adapter || defaults_1.defaults.timerController.adapter,
-        executor: options.executor || defaults_1.defaults.timerController.executor
+    const newOptions = {
+        adapter: options.adapter || defaults_1.defaults.timerController.adapter
     };
     return newOptions;
 }

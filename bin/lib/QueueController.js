@@ -8,7 +8,6 @@ class QueueController {
         options = processOptions(options);
         this.taskMap = new Map();
         this.adapter = options.adapter;
-        this.executor = options.executor;
     }
     set(functionName, taskConfig) {
         if (this.taskMap.has(functionName)) {
@@ -24,12 +23,10 @@ class QueueController {
         if (!opConfig) {
             throw new Error(`Task handler for '${functionName}' could not be found`);
         }
-        let executed = false;
-        let opContext = undefined;
+        let operation = undefined;
         try {
             // 1 ----- create operation context
-            const opContextConfig = this.adapter(context, opConfig.options);
-            opContext = await this.executor.createContext(opContextConfig);
+            const operation = this.adapter(context, opConfig.actions, opConfig.options);
             // 2 ----- build action inputs
             let actionInputs = undefined;
             if (opConfig.processor) {
@@ -40,17 +37,16 @@ class QueueController {
                 actionInputs = message;
             }
             // 3 ----- execute actions
-            const result = await this.executor.execute(opConfig.actions, actionInputs, opContext);
-            executed = true;
-            // 4 ------ close the context
-            await this.executor.closeContext(opContext);
-            // return the result
+            const result = await operation.execute(actionInputs);
+            // 4 ----- log the operation and return the result
+            operation.log.close(201, true); // TODO: set status to something else?
             return result;
         }
         catch (error) {
-            // if the context hasn't been closed yet - close it
-            if (opContext && !executed) {
-                await this.executor.closeContext(opContext, error);
+            // if the operation has been created - use it to log errors
+            if (operation) {
+                operation.log.error(error);
+                operation.log.close(500, false); // TODO: set status to something else?
             }
             throw error;
         }
@@ -62,9 +58,8 @@ exports.QueueController = QueueController;
 function processOptions(options) {
     if (!options)
         return defaults_1.defaults.queueController;
-    let newOptions = {
-        adapter: options.adapter || defaults_1.defaults.queueController.adapter,
-        executor: options.executor || defaults_1.defaults.queueController.executor
+    const newOptions = {
+        adapter: options.adapter || defaults_1.defaults.queueController.adapter
     };
     return newOptions;
 }

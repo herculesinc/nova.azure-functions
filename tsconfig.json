@@ -1,9 +1,13 @@
 {
     "compilerOptions": {
         "target": "es2017",
+        "module": "commonjs",
+        "strict": true,
+        "strictNullChecks": false,
+        "noImplicitAny": false,
         "noEmitOnError": true,
         "sourceMap": true,
-        "outDir": "bin",
-		"module": "commonjs"
+        "rootDir": ".",
+        "outDir": "bin"
     }
 }

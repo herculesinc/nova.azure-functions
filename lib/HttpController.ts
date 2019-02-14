@@ -1,10 +1,10 @@
 // IMPORTS
 // =================================================================================================
 import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
+import { Executable, Context } from '@nova/core';
 import { 
-    Action, OperationContext, Executor, HttpControllerConfig, HttpRequestAdapter,
-    HttpRouteConfig, HttpEndpointConfig, HttpEndpointDefaults, CorsOptions,
-    Authenticator, HttpInputParser, HttpInputValidator, HttpInputMutator, ViewBuilder, StringBag
+    Action, HttpControllerConfig, HttpOperationAdapter, HttpRouteConfig, HttpEndpointConfig, HttpEndpointDefaults,
+    Authenticator, HttpInputParser, HttpInputValidator, HttpInputMutator, ViewBuilder, StringBag, CorsOptions
 } from '@nova/azure-functions';
 import * as Router from 'find-my-way';
 import * as typeIs from 'type-is';
@@ -17,17 +17,17 @@ const JSON_CONTENT = ['application/json'];
 
 // INTERFACES
 // =================================================================================================
-interface OperationConfig<T extends OperationContext, V> {
+interface OperationConfig<O> {
     method          : string;
     path            : string;
     scope           : string;
     headers         : StringBag;
-    options         : V;
+    options         : O;
     defaults        : object;
-    parser          : HttpInputParser<T>;
+    parser          : HttpInputParser;
     validator       : HttpInputValidator;
-    authenticator   : Authenticator<T>;
-    mutator         : HttpInputMutator<T>;
+    authenticator   : Authenticator;
+    mutator         : HttpInputMutator;
     actions         : Action[];
     view            : ViewBuilder;
 }
@@ -38,17 +38,16 @@ const enum HttpStatusCode {
 
 // CLASS DEFINITION
 // =================================================================================================
-export class HttpController<T extends OperationContext, V> {
+export class HttpController<O> {
 
     private readonly routers    : Map<string,Router.Router>;
-    private readonly adapter    : HttpRequestAdapter<V>;
-    private readonly executor   : Executor<T,V>;
-    private readonly defaults   : HttpEndpointDefaults<T>;
+    private readonly adapter    : HttpOperationAdapter;
+    private readonly defaults   : HttpEndpointDefaults;
 
     private readonly routerOptions      : Router.RouterConfig;
     private readonly rethrowThreshold   : number;
 
-    constructor(options?: HttpControllerConfig<T,V>) {
+    constructor(options?: HttpControllerConfig) {
         options = processOptions(options);
 
         this.routers = new Map();
@@ -56,11 +55,10 @@ export class HttpController<T extends OperationContext, V> {
         this.rethrowThreshold = options.rethrowThreshold;
 
         this.adapter = options.adapter;
-        this.executor = options.executor;
         this.defaults = options.defaults;
     }
 
-    set(functionName: string, route: string, config: HttpRouteConfig<T,V>) {
+    set(functionName: string, route: string, config: HttpRouteConfig) {
 
         let router = this.routers.get(functionName);
         if (!router) {
@@ -124,9 +122,8 @@ export class HttpController<T extends OperationContext, V> {
             };
         }
         
-        let executed = false;
-        let opContext: T = undefined;
-        const opConfig = route.store as OperationConfig<T,V>;
+        let operation: Executable & Context = undefined;
+        const opConfig = route.store as OperationConfig<O>;
         try {
             // 1 ----- create operation context
             const reqHead = {
@@ -136,13 +133,12 @@ export class HttpController<T extends OperationContext, V> {
                 ip      : util.getIpAddress(request.headers),
                 url     : request.originalUrl
             };
-            const opContextConfig = this.adapter(reqHead, context, opConfig.options);
-            opContext = await this.executor.createContext(opContextConfig);
+            operation = this.adapter(context, reqHead, opConfig.actions, opConfig.options);
 
             // 2 ----- transform request into inputs object
             let inputs = undefined;
             if (opConfig.parser) {
-                inputs = await opConfig.parser(request, opConfig.defaults, route.params, opContext);
+                inputs = await opConfig.parser.call(operation, request, opConfig.defaults, route.params);
                 if (typeof inputs !== 'object') throw new Error('Invalid value received from input parser');
             }
             else {
@@ -173,13 +169,13 @@ export class HttpController<T extends OperationContext, V> {
                     // auth header could not be parsed
                     return defaults.invalidAuthHeaderResponse;
                 }
-                auth = await opConfig.authenticator(opConfig.scope, credentials, opContext); 
+                auth = await opConfig.authenticator.call(operation, opConfig.scope, credentials); 
             }
 
             // 5 ----- split inputs into action inputs and view options
             let actionInputs = undefined, viewOptions = undefined;
             if (opConfig.mutator) {
-                const result = await opConfig.mutator(inputs, auth, opContext);
+                const result = await opConfig.mutator.call(operation, inputs, auth);
                 actionInputs = result.action;
                 viewOptions = result.view;
             }
@@ -188,13 +184,9 @@ export class HttpController<T extends OperationContext, V> {
             }            
 
             // 6 ----- execute actions
-            const result = await this.executor.execute(opConfig.actions, actionInputs, opContext);
-            executed = true;
+            const result = await operation.execute(actionInputs);
 
-            // 7 ------ close the context
-            await this.executor.closeContext(opContext);
-
-            // 8 ----- build the response
+            // 7 ----- build the response
             let response: AzureHttpResponse;
             if (!result || !opConfig.view) {
                 response = {
@@ -207,7 +199,7 @@ export class HttpController<T extends OperationContext, V> {
 
                 const view = opConfig.view(result, viewOptions, {
                     viewer      : auth,
-                    timestamp   : opContext.timestamp
+                    timestamp   : operation.timestamp
                 });
 
                 if (!view) {
@@ -226,8 +218,8 @@ export class HttpController<T extends OperationContext, V> {
                 }
             }
 
-            // 9 ----- log the request and return the result
-            opContext.log.close(response.status, true);
+            // 8 ----- log the request and return the result
+            operation.log.close(response.status, true);
             return response;
         }
         catch(error) {
@@ -235,22 +227,10 @@ export class HttpController<T extends OperationContext, V> {
             // determine error status
             const status = error.status || HttpStatusCode.InternalServerError;
 
-            // if the context has been created - use it to log errors
-            if (opContext) {
-                opContext.log.error(error);
-
-                // if the context hasn't been closed yet - try close it
-                if (!executed) {
-                    try {
-                        await this.executor.closeContext(opContext, error);
-                    }
-                    catch (closingError) {
-                        opContext.log.error(closingError);
-                    }
-                }
-
-                // mark the request as closed
-                opContext.log.close(status, false);
+            // if the operation has been created - use it to log errors
+            if (operation) {
+                operation.log.error(error);
+                operation.log.close(status, false);
             }
 
             // if the error is over the threshold, throw it
@@ -272,12 +252,11 @@ export class HttpController<T extends OperationContext, V> {
 
 // HELPER FUNCTIONS
 // =================================================================================================
-function processOptions(options: HttpControllerConfig<any,any>): HttpControllerConfig<any,any> {
+function processOptions(options: HttpControllerConfig): HttpControllerConfig {
     if (!options) return defaults.httpController;
 
-    let newOptions: HttpControllerConfig<any, any> = {
+    const newOptions: HttpControllerConfig = {
         adapter         : options.adapter || defaults.httpController.adapter,
-        executor        : options.executor || defaults.httpController.executor,
         routerOptions   : options.routerOptions,
         rethrowThreshold: options.rethrowThreshold || defaults.httpController.rethrowThreshold,
         defaults        : undefined,
@@ -308,7 +287,7 @@ function cleanPath(path: string) {
     return path;
 }
 
-function buildCorsHeaders(config: HttpRouteConfig<any,any>, defaultCors: CorsOptions) {
+function buildCorsHeaders(config: HttpRouteConfig, defaultCors: CorsOptions) {
 
     // merge default and rout CORS
     const cors = { ...defaultCors, ...config.cors };
@@ -331,7 +310,7 @@ function buildCorsHeaders(config: HttpRouteConfig<any,any>, defaultCors: CorsOpt
     };
 }
 
-function buildOpConfig(method: string, path: string, config: HttpEndpointConfig<any,any>, defaults: HttpEndpointDefaults<any>, cors: StringBag): OperationConfig<any, any> {
+function buildOpConfig(method: string, path: string, config: HttpEndpointConfig, defaults: HttpEndpointDefaults, cors: StringBag): OperationConfig<any> {
 
     // determine view
     const view = config.view === undefined ? defaults.view : config.view;

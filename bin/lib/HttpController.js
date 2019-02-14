@@ -16,7 +16,6 @@ class HttpController {
         this.routerOptions = options.routerOptions;
         this.rethrowThreshold = options.rethrowThreshold;
         this.adapter = options.adapter;
-        this.executor = options.executor;
         this.defaults = options.defaults;
     }
     set(functionName, route, config) {
@@ -70,8 +69,7 @@ class HttpController {
                 body: null
             };
         }
-        let executed = false;
-        let opContext = undefined;
+        let operation = undefined;
         const opConfig = route.store;
         try {
             // 1 ----- create operation context
@@ -82,12 +80,11 @@ class HttpController {
                 ip: util.getIpAddress(request.headers),
                 url: request.originalUrl
             };
-            const opContextConfig = this.adapter(reqHead, context, opConfig.options);
-            opContext = await this.executor.createContext(opContextConfig);
+            operation = this.adapter(context, reqHead, opConfig.actions, opConfig.options);
             // 2 ----- transform request into inputs object
             let inputs = undefined;
             if (opConfig.parser) {
-                inputs = await opConfig.parser(request, opConfig.defaults, route.params, opContext);
+                inputs = await opConfig.parser.call(operation, request, opConfig.defaults, route.params);
                 if (typeof inputs !== 'object')
                     throw new Error('Invalid value received from input parser');
             }
@@ -117,12 +114,12 @@ class HttpController {
                     // auth header could not be parsed
                     return defaults_1.defaults.invalidAuthHeaderResponse;
                 }
-                auth = await opConfig.authenticator(opConfig.scope, credentials, opContext);
+                auth = await opConfig.authenticator.call(operation, opConfig.scope, credentials);
             }
             // 5 ----- split inputs into action inputs and view options
             let actionInputs = undefined, viewOptions = undefined;
             if (opConfig.mutator) {
-                const result = await opConfig.mutator(inputs, auth, opContext);
+                const result = await opConfig.mutator.call(operation, inputs, auth);
                 actionInputs = result.action;
                 viewOptions = result.view;
             }
@@ -130,11 +127,8 @@ class HttpController {
                 actionInputs = inputs;
             }
             // 6 ----- execute actions
-            const result = await this.executor.execute(opConfig.actions, actionInputs, opContext);
-            executed = true;
-            // 7 ------ close the context
-            await this.executor.closeContext(opContext);
-            // 8 ----- build the response
+            const result = await operation.execute(actionInputs);
+            // 7 ----- build the response
             let response;
             if (!result || !opConfig.view) {
                 response = {
@@ -146,7 +140,7 @@ class HttpController {
             else {
                 const view = opConfig.view(result, viewOptions, {
                     viewer: auth,
-                    timestamp: opContext.timestamp
+                    timestamp: operation.timestamp
                 });
                 if (!view) {
                     response = {
@@ -163,27 +157,17 @@ class HttpController {
                     };
                 }
             }
-            // 9 ----- log the request and return the result
-            opContext.log.close(response.status, true);
+            // 8 ----- log the request and return the result
+            operation.log.close(response.status, true);
             return response;
         }
         catch (error) {
             // determine error status
             const status = error.status || 500 /* InternalServerError */;
-            // if the context has been created - use it to log errors
-            if (opContext) {
-                opContext.log.error(error);
-                // if the context hasn't been closed yet - try close it
-                if (!executed) {
-                    try {
-                        await this.executor.closeContext(opContext, error);
-                    }
-                    catch (closingError) {
-                        opContext.log.error(closingError);
-                    }
-                }
-                // mark the request as closed
-                opContext.log.close(status, false);
+            // if the operation has been created - use it to log errors
+            if (operation) {
+                operation.log.error(error);
+                operation.log.close(status, false);
             }
             // if the error is over the threshold, throw it
             if (status > this.rethrowThreshold) {
@@ -206,9 +190,8 @@ exports.HttpController = HttpController;
 function processOptions(options) {
     if (!options)
         return defaults_1.defaults.httpController;
-    let newOptions = {
+    const newOptions = {
         adapter: options.adapter || defaults_1.defaults.httpController.adapter,
-        executor: options.executor || defaults_1.defaults.httpController.executor,
         routerOptions: options.routerOptions,
         rethrowThreshold: options.rethrowThreshold || defaults_1.defaults.httpController.rethrowThreshold,
         defaults: undefined,

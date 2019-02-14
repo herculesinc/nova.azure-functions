@@ -2,9 +2,9 @@
 // IMPORTS
 // =================================================================================================
 import { AzureFunctionContext, AzureQueueBidingData } from 'azure-functions';
-import {
-    Action, Executor, OperationContext,
-    QueueControllerConfig, QueueTaskConfig, QueueInputProcessor, QueueAdapter, QueueMessageMetadata
+import { Executable, Context } from '@nova/core';
+import { 
+    Action, QueueControllerConfig, QueueTaskConfig, QueueInputProcessor, QueueOperationAdapter, QueueMessageMetadata
 } from '@nova/azure-functions';
 import { defaults } from './defaults';
 
@@ -20,21 +20,19 @@ interface OperationConfig<V> {
 
 // CLASS DEFINITION
 // =================================================================================================
-export class QueueController<T extends OperationContext, V> {
+export class QueueController<O> {
 
-    private readonly taskMap    : Map<string, OperationConfig<V>>;
-    private readonly adapter    : QueueAdapter<V>;
-    private readonly executor   : Executor<T,V>;
+    private readonly taskMap    : Map<string, OperationConfig<O>>;
+    private readonly adapter    : QueueOperationAdapter;
 
-    constructor(options?: QueueControllerConfig<T,V>) {
+    constructor(options?: QueueControllerConfig) {
         options = processOptions(options);
 
         this.taskMap = new Map();
         this.adapter = options.adapter;
-        this.executor = options.executor;
     }
 
-    set(functionName: string, taskConfig: QueueTaskConfig<T,V>) {
+    set(functionName: string, taskConfig: QueueTaskConfig) {
         if (this.taskMap.has(functionName)) {
             throw new TypeError(`Queue task handler for '${functionName}' has already been registered`);
         }
@@ -51,12 +49,10 @@ export class QueueController<T extends OperationContext, V> {
             throw new Error(`Task handler for '${functionName}' could not be found`);
         }
 
-        let executed = false;
-        let opContext: T = undefined;
+        let operation: Executable & Context = undefined;
         try {
             // 1 ----- create operation context
-            const opContextConfig = this.adapter(context, opConfig.options);
-            opContext = await this.executor.createContext(opContextConfig);
+            const operation = this.adapter(context, opConfig.actions, opConfig.options);
 
             // 2 ----- build action inputs
             let actionInputs = undefined;
@@ -69,19 +65,17 @@ export class QueueController<T extends OperationContext, V> {
             }
 
             // 3 ----- execute actions
-            const result = await this.executor.execute(opConfig.actions, actionInputs, opContext);
-            executed = true;
+            const result = await operation.execute(actionInputs);
 
-            // 4 ------ close the context
-            await this.executor.closeContext(opContext);
-
-            // return the result
+            // 4 ----- log the operation and return the result
+            operation.log.close(201, true);         // TODO: set status to something else?
             return result;
         }
         catch (error) {
-            // if the context hasn't been closed yet - close it
-            if (opContext && !executed) {
-                await this.executor.closeContext(opContext, error);
+            // if the operation has been created - use it to log errors
+            if (operation) {
+                operation.log.error(error);
+                operation.log.close(500, false);    // TODO: set status to something else?
             }
 
             throw error;
@@ -91,18 +85,17 @@ export class QueueController<T extends OperationContext, V> {
 
 // HELPER FUNCTIONS
 // =================================================================================================
-function processOptions(options: QueueControllerConfig<any,any>): QueueControllerConfig<any,any> {
+function processOptions(options: QueueControllerConfig): QueueControllerConfig {
     if (!options) return defaults.queueController;
 
-    let newOptions: QueueControllerConfig<any, any> = {
-        adapter         : options.adapter || defaults.queueController.adapter,
-        executor        : options.executor || defaults.queueController.executor
+    const newOptions: QueueControllerConfig = {
+        adapter         : options.adapter || defaults.queueController.adapter
     };
 
     return newOptions;
 }
 
-function buildOpConfig(functionName: string, taskConfig: QueueTaskConfig<any,any>): OperationConfig<any> {
+function buildOpConfig(functionName: string, taskConfig: QueueTaskConfig): OperationConfig<any> {
 
  
     // validate and build actions

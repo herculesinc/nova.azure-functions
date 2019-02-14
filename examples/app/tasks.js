@@ -11,7 +11,7 @@ module.exports = controller;
 // =================================================================================================
 controller.set('QueueTrigger', {
     inputs  : (message, defaults, meta) => ({ message, defaults, meta }),
-    action  : async (inputs, context) => {
-        context.log.info(inputs);
+    action  : async function (inputs) {
+        this.log.info(inputs);
     }
 });

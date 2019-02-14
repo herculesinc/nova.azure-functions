@@ -12,19 +12,23 @@ module.exports = controller;
 controller.set('HttpTrigger', '/', {
     get: {
         scope   : 'account:read',
-        auth    : async (scope, credentials) => {
+        auth    : async function(scope, credentials) {
             if (credentials) {
                 return credentials.data;
             }
         },
-        mutator : (inputs, auth) => ({
-            action  : { ...inputs, auth },
-            view    : { include: inputs.include }
-        }),
-        action  : async (inputs, context) => {
-            return { action: 'GET /', name: context.name, inputs };
+        mutator : function (inputs, auth) {
+            return {
+                action  : { ...inputs, auth },
+                view    : { include: inputs.include }
+            };
         },
-        view    : (result, options, context) => ({ result, options, context })
+        action  : async function (inputs) {
+            return { action: 'GET /', name: this.name, inputs };
+        },
+        view    : (result, options) => { 
+            return { result, options, context: this }; 
+        } 
     },
     post: {
         scope   : 'account:update',
@@ -33,12 +37,12 @@ controller.set('HttpTrigger', '/', {
         view    : (result, options, context) => ({ result, options, context })
     },
     put: {
-        action  : async (inputs, context) => {
+        action  : async (inputs) => {
 
-            context.log.debug('Debug text');
-            context.log.info('Info text');
-            context.log.warn('Warning text');
-            context.log.error(new Error('Error message'));
+            this.log.debug('Debug text');
+            this.log.info('Info text');
+            this.log.warn('Warning text');
+            this.log.error(new Error('Error message'));
 
             const error = new Error('Boom 400!');
             error.status = 400;
@@ -75,10 +79,10 @@ controller.set('HttpTrigger', '/multipart', {
 
 controller.set('HttpTrigger', '/view', {
     get: {
-        action  : (inputs, context) => { 
+        action  : (inputs) => { 
             return {
                 action  : 'GET /view',
-                name    : context.name,
+                name    : this.name,
                 inputs 
             };
         },

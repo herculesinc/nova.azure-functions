@@ -2,9 +2,8 @@
 // IMPORTS
 // =================================================================================================
 import { AzureFunctionContext } from 'azure-functions';
-import {
-    Action, Executor, OperationContext, TimerControllerConfig, TimerHandlerConfig, TimerAdapter
-} from '@nova/azure-functions';
+import { Executable, Context } from '@nova/core';
+import { Action, TimerControllerConfig, TimerHandlerConfig, TimerOperationAdapter } from '@nova/azure-functions';
 import { defaults } from './defaults';
 
 // INTERFACES
@@ -18,21 +17,19 @@ interface OperationConfig<V> {
 
 // CLASS DEFINITION
 // =================================================================================================
-export class TimerController<T extends OperationContext, V> {
+export class TimerController<O> {
 
-    private readonly handlers : Map<string, OperationConfig<V>>;
-    private readonly adapter    : TimerAdapter<V>;
-    private readonly executor   : Executor<T,V>;
+    private readonly handlers   : Map<string, OperationConfig<O>>;
+    private readonly adapter    : TimerOperationAdapter;
 
-    constructor(options?: TimerControllerConfig<T,V>) {
+    constructor(options?: TimerControllerConfig) {
         options = processOptions(options);
 
         this.handlers = new Map();
         this.adapter = options.adapter;
-        this.executor = options.executor;
     }
 
-    set(functionName: string, taskConfig: TimerHandlerConfig<T,V>) {
+    set(functionName: string, taskConfig: TimerHandlerConfig) {
         if (this.handlers.has(functionName)) {
             throw new TypeError(`Timer handler for '${functionName}' has already been registered`);
         }
@@ -49,27 +46,23 @@ export class TimerController<T extends OperationContext, V> {
             throw new Error(`Task handler for '${functionName}' could not be found`);
         }
 
-        let executed = false;
-        let opContext: T = undefined;
+        let operation: Executable & Context = undefined;
         try {
-            // 1 ----- create operation context
-            const opContextConfig = this.adapter(context, opConfig.options);
-            opContext = await this.executor.createContext(opContextConfig);
+            // 1 ----- create operation
+            operation = this.adapter(context, opConfig.actions, opConfig.options);
 
             // 2 ----- execute actions
-            const result = await this.executor.execute(opConfig.actions, undefined, opContext);
-            executed = true;
+            const result = await operation.execute(undefined);
 
-            // 3 ------ close the context
-            await this.executor.closeContext(opContext);
-
-            // return the result
+            // 3 ----- log the operation and return the result
+            operation.log.close(201, true);         // TODO: set status to something else?
             return result;
         }
         catch (error) {
-            // if the context hasn't been closed yet - close it
-            if (opContext && !executed) {
-                await this.executor.closeContext(opContext, error);
+            // if the operation has been created - use it to log errors
+            if (operation) {
+                operation.log.error(error);
+                operation.log.close(500, false);    // TODO: set status to something else?
             }
 
             throw error;
@@ -79,18 +72,17 @@ export class TimerController<T extends OperationContext, V> {
 
 // HELPER FUNCTIONS
 // =================================================================================================
-function processOptions(options: TimerControllerConfig<any,any>): TimerControllerConfig<any,any> {
+function processOptions(options: TimerControllerConfig): TimerControllerConfig {
     if (!options) return defaults.timerController;
 
-    let newOptions: TimerControllerConfig<any, any> = {
-        adapter         : options.adapter || defaults.timerController.adapter,
-        executor        : options.executor || defaults.timerController.executor
+    const newOptions: TimerControllerConfig = {
+        adapter         : options.adapter || defaults.timerController.adapter
     };
 
     return newOptions;
 }
 
-function buildOpConfig(functionName: string, taskConfig: TimerHandlerConfig<any,any>): OperationConfig<any> {
+function buildOpConfig(functionName: string, taskConfig: TimerHandlerConfig): OperationConfig<any> {
 
  
     // validate and build actions

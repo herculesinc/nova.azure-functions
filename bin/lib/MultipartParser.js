@@ -10,7 +10,7 @@ function buildParser(options) {
     options = options || defaults_1.defaults.multipartParser;
     const filters = buildFilters(options.filter);
     const busboyConfig = buildBusboyConfig(options);
-    return function (request, params, defaults, context) {
+    return function (request, params, defaults) {
         return new Promise((resolve, reject) => {
             let errorOccurred = false;
             // TODO: validate that body is a buffer
@@ -33,7 +33,7 @@ function buildParser(options) {
                 let fileCount = fileCounts[fieldName] || 0;
                 if (fileCount >= maxCount) {
                     fileStream.on('error', (error) => {
-                        context.log.error(new Error('FileStream error: ' + error.message));
+                        this.log.error(new Error('FileStream error: ' + error.message));
                         abortWithError(error);
                     });
                     fileStream.destroy(new Error('test1'));
@@ -89,19 +89,18 @@ function buildParser(options) {
                 }
                 resolve(inputs);
             });
+            const abortWithError = (error) => {
+                this.log.error(new Error('Error:' + error.message + '[' + errorOccurred + ']'));
+                if (errorOccurred)
+                    return;
+                errorOccurred = true;
+                reject(error);
+            };
             busboy.on('error', abortWithError);
             busboy.on('partsLimit', () => abortWithError(new Error(errors.partCountExceeded)));
             busboy.on('filesLimit', () => abortWithError(new Error(errors.fileCountExceeded)));
             busboy.on('fieldsLimit', () => abortWithError(new Error(errors.fieldCountExceeded)));
             busboy.write(request.body);
-            function abortWithError(error) {
-                context.log.error(new Error('Error:' + error.message + '[' + errorOccurred + ']'));
-                if (errorOccurred)
-                    return;
-                errorOccurred = true;
-                busboy.destroy(new Error('test2'));
-                reject(error);
-            }
         });
     };
 }

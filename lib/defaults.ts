@@ -1,17 +1,18 @@
 // IMPORTS
 // =================================================================================================
+import { Operation } from '@nova/core';
 import { AzureHttpResponse, AzureFunctionContext } from 'azure-functions';
 import {
-    HttpControllerConfig, HttpRequestHead, Action, MultipartDefaults, OperationContext,
-    OperationContextConfig, QueueControllerConfig, TimerControllerConfig, Logger, TraceSource, TraceCommand
+    HttpControllerConfig, HttpRequestHead, MultipartDefaults, Action,
+    QueueControllerConfig, TimerControllerConfig, Logger, TraceSource, TraceCommand
 } from '@nova/azure-functions';
 
 // INTERFACES
 // =================================================================================================
 interface Defaults {
-    httpController              : HttpControllerConfig<OperationContext,void>;
-    queueController             : QueueControllerConfig<OperationContext,void>;
-    timerController             : TimerControllerConfig<OperationContext,void>;
+    httpController              : HttpControllerConfig;
+    queueController             : QueueControllerConfig;
+    timerController             : TimerControllerConfig;
     multipartParser             : MultipartDefaults;
     notFoundResponse            : AzureHttpResponse;
     invalidContentResponse      : AzureHttpResponse;
@@ -22,12 +23,7 @@ interface Defaults {
 // =================================================================================================
 export const defaults: Defaults = {
     httpController: {
-        adapter             : defaultHttpContextAdapter,
-        executor: {
-            createContext   : defaultContextBuilder,
-            closeContext    : defaultContextCloser,
-            execute         : defaultActionExecutor
-        },
+        adapter             : defaultHttpOperationAdapter,
         rethrowThreshold    : 500,
         defaults: {
             cors: {
@@ -40,20 +36,10 @@ export const defaults: Defaults = {
         }
     },
     queueController: {
-        adapter             : defaultTaskContextAdapter,
-        executor: {
-            createContext   : defaultContextBuilder,
-            closeContext    : defaultContextCloser,
-            execute         : defaultActionExecutor
-        },
+        adapter             : defaultQueueOperationAdapter
     },
     timerController: {
-        adapter             : defaultChronContextAdapter,
-        executor: {
-            createContext   : defaultContextBuilder,
-            closeContext    : defaultContextCloser,
-            execute         : defaultActionExecutor
-        },
+        adapter             : defaultTimerOperationAdapter
     },
     multipartParser         : { },  // using busboy defaults
     notFoundResponse: {
@@ -77,57 +63,47 @@ export const symbols = {
 
 // DEFAULT FUNCTIONS
 // =================================================================================================
-function defaultHttpContextAdapter(request: HttpRequestHead, context: AzureFunctionContext, options: any): OperationContextConfig<any> {
+function defaultHttpOperationAdapter(context: AzureFunctionContext, request: HttpRequestHead, actions: Action[]): Operation {
     const functionName = context.executionContext.functionName;
     const operationName = request.method + ' /' + functionName + request.route;
-    return {
+
+    const config = {
         id          : context.invocationId,
         name        : operationName,
         origin      : request.ip || 'unknown',
-        logger      : buildDefaultLogger(context, operationName)
+        actions     : actions
     };
+    const logger = buildDefaultLogger(context, operationName);
+
+    return new Operation(config, undefined, logger);
 }
 
-function defaultTaskContextAdapter(context: AzureFunctionContext, options: any): OperationContextConfig<any> {
+function defaultQueueOperationAdapter(context: AzureFunctionContext, actions: Action[]): Operation {
     const operationName = context.executionContext.functionName;
-    return {
+
+    const config = {
         id          : context.invocationId,
         name        : operationName,
         origin      : 'undefined',
-        logger      : buildDefaultLogger(context, operationName)
+        actions     : actions
     };
+    const logger = buildDefaultLogger(context, operationName);
+
+    return new Operation(config, undefined, logger);
 }
 
-function defaultChronContextAdapter(context: AzureFunctionContext, options: any): OperationContextConfig<any> {
+function defaultTimerOperationAdapter(context: AzureFunctionContext, actions: Action[]): Operation {
     const operationName = context.executionContext.functionName;
-    return {
+
+    const config = {
         id          : context.invocationId,
         name        : operationName,
         origin      : 'timer',
-        logger      : buildDefaultLogger(context, operationName)
+        actions     : actions
     };
-}
+    const logger = buildDefaultLogger(context, operationName);
 
-function defaultContextBuilder(options: OperationContextConfig<any>) {
-    return Promise.resolve({
-        id          : options.id,
-        name        : options.name,
-        origin      : options.origin,
-        timestamp   : Date.now(),
-        log         : options.logger
-    });
-}
-
-function defaultContextCloser(context: OperationContext, error?: Error) {
-    return Promise.resolve();
-}
-
-async function defaultActionExecutor(actions: Action[], inputs: any, context: any) {
-    let result = inputs;
-    for (let action of actions) {
-        result = await action(result, context);
-    }
-    return result;
+    return new Operation(config, undefined, logger);
 }
 
 function defaultView(result: any): any {
@@ -144,11 +120,15 @@ function buildDefaultLogger(context: AzureFunctionContext, operationName: string
         operationId         : context.invocationId,
         authenticatedUserId : undefined,
 
-        debug   : message => azLogger.verbose(message),
-        info    : message => azLogger.info(message),
-        warn    : message => azLogger.warn(message),
-        error   : error => azLogger.error(error && error.message),
-        trace   : (source: TraceSource, command: TraceCommand, duration: number, success: boolean) => {
+        debug   : (message: string) => azLogger.verbose(message),
+        info    : (message: string) => azLogger.info(message),
+        warn    : (message: string) => azLogger.warn(message),
+        error   : (error: Error) => azLogger.error(error && error.message),
+        trace   : (source: TraceSource, command: string | TraceCommand, duration: number, success: boolean) => {
+            if (typeof command === 'string') {
+                command = { name: command };
+            }
+
             if (success) {
                 azLogger.info(`Executed ${source.name} ${command.name} command in ${duration}ms`);
             }

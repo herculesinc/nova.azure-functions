@@ -2,18 +2,18 @@
 // =================================================================================================
 import * as Busboy from 'busboy';
 import { AzureHttpRequest } from 'azure-functions';
-import { MultipartConfig, MultipartFilter, OperationContext } from '@nova/azure-functions';
+import { HttpInputParser, MultipartConfig, MultipartFilter, Operation } from '@nova/azure-functions';
 import { defaults } from './defaults';
 
 // PUBLIC FUNCTIONS
 // =================================================================================================
-export function buildParser(options?: MultipartConfig) {
+export function buildParser(options?: MultipartConfig): HttpInputParser {
 
     options = options || defaults.multipartParser;
     const filters = buildFilters(options.filter);
     const busboyConfig = buildBusboyConfig(options);
 
-    return function(request: AzureHttpRequest, params: object, defaults: object, context: OperationContext) {
+    return function(request: AzureHttpRequest, params: object, defaults: object) {
         return new Promise((resolve, reject) => {
 
             let errorOccurred = false;
@@ -42,7 +42,7 @@ export function buildParser(options?: MultipartConfig) {
                 let fileCount = fileCounts[fieldName] || 0;
                 if (fileCount >= maxCount) {
                     fileStream.on('error', (error) => {
-                        context.log.error(new Error('FileStream error: ' + error.message));
+                        this.log.error(new Error('FileStream error: ' + error.message));
                         abortWithError(error);
                     });
 
@@ -109,22 +109,20 @@ export function buildParser(options?: MultipartConfig) {
                 resolve(inputs);
             });
 
+            const abortWithError = (error: Error) => {
+                this.log.error(new Error('Error:' + error.message + '[' + errorOccurred + ']'));
+                if (errorOccurred) return;
+                errorOccurred = true;
+            
+                reject(error);
+            };
+
             busboy.on('error', abortWithError);
             busboy.on('partsLimit', () => abortWithError(new Error(errors.partCountExceeded)));
             busboy.on('filesLimit', () => abortWithError(new Error(errors.fileCountExceeded)));
             busboy.on('fieldsLimit', () => abortWithError(new Error(errors.fieldCountExceeded)));
     
             busboy.write(request.body as Buffer);
-
-            function abortWithError(error: Error) {
-                context.log.error(new Error('Error:' + error.message + '[' + errorOccurred + ']'));
-                if (errorOccurred) return;
-                errorOccurred = true;
-                
-                busboy.destroy(new Error('test2'));
-
-                reject(error);
-            }
         });
     };
 }

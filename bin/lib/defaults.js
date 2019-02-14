@@ -1,15 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+// IMPORTS
+// =================================================================================================
+const core_1 = require("@nova/core");
 // MODULE VARIABLES
 // =================================================================================================
 exports.defaults = {
     httpController: {
-        adapter: defaultHttpContextAdapter,
-        executor: {
-            createContext: defaultContextBuilder,
-            closeContext: defaultContextCloser,
-            execute: defaultActionExecutor
-        },
+        adapter: defaultHttpOperationAdapter,
         rethrowThreshold: 500,
         defaults: {
             cors: {
@@ -22,20 +20,10 @@ exports.defaults = {
         }
     },
     queueController: {
-        adapter: defaultTaskContextAdapter,
-        executor: {
-            createContext: defaultContextBuilder,
-            closeContext: defaultContextCloser,
-            execute: defaultActionExecutor
-        },
+        adapter: defaultQueueOperationAdapter
     },
     timerController: {
-        adapter: defaultChronContextAdapter,
-        executor: {
-            createContext: defaultContextBuilder,
-            closeContext: defaultContextCloser,
-            execute: defaultActionExecutor
-        },
+        adapter: defaultTimerOperationAdapter
     },
     multipartParser: {},
     notFoundResponse: {
@@ -57,52 +45,39 @@ exports.symbols = {
 };
 // DEFAULT FUNCTIONS
 // =================================================================================================
-function defaultHttpContextAdapter(request, context, options) {
+function defaultHttpOperationAdapter(context, request, actions) {
     const functionName = context.executionContext.functionName;
     const operationName = request.method + ' /' + functionName + request.route;
-    return {
+    const config = {
         id: context.invocationId,
         name: operationName,
         origin: request.ip || 'unknown',
-        logger: buildDefaultLogger(context, operationName)
+        actions: actions
     };
+    const logger = buildDefaultLogger(context, operationName);
+    return new core_1.Operation(config, undefined, logger);
 }
-function defaultTaskContextAdapter(context, options) {
+function defaultQueueOperationAdapter(context, actions) {
     const operationName = context.executionContext.functionName;
-    return {
+    const config = {
         id: context.invocationId,
         name: operationName,
         origin: 'undefined',
-        logger: buildDefaultLogger(context, operationName)
+        actions: actions
     };
+    const logger = buildDefaultLogger(context, operationName);
+    return new core_1.Operation(config, undefined, logger);
 }
-function defaultChronContextAdapter(context, options) {
+function defaultTimerOperationAdapter(context, actions) {
     const operationName = context.executionContext.functionName;
-    return {
+    const config = {
         id: context.invocationId,
         name: operationName,
         origin: 'timer',
-        logger: buildDefaultLogger(context, operationName)
+        actions: actions
     };
-}
-function defaultContextBuilder(options) {
-    return Promise.resolve({
-        id: options.id,
-        name: options.name,
-        origin: options.origin,
-        timestamp: Date.now(),
-        log: options.logger
-    });
-}
-function defaultContextCloser(context, error) {
-    return Promise.resolve();
-}
-async function defaultActionExecutor(actions, inputs, context) {
-    let result = inputs;
-    for (let action of actions) {
-        result = await action(result, context);
-    }
-    return result;
+    const logger = buildDefaultLogger(context, operationName);
+    return new core_1.Operation(config, undefined, logger);
 }
 function defaultView(result) {
     return result;
@@ -115,11 +90,14 @@ function buildDefaultLogger(context, operationName) {
     return {
         operationId: context.invocationId,
         authenticatedUserId: undefined,
-        debug: message => azLogger.verbose(message),
-        info: message => azLogger.info(message),
-        warn: message => azLogger.warn(message),
-        error: error => azLogger.error(error && error.message),
+        debug: (message) => azLogger.verbose(message),
+        info: (message) => azLogger.info(message),
+        warn: (message) => azLogger.warn(message),
+        error: (error) => azLogger.error(error && error.message),
         trace: (source, command, duration, success) => {
+            if (typeof command === 'string') {
+                command = { name: command };
+            }
             if (success) {
                 azLogger.info(`Executed ${source.name} ${command.name} command in ${duration}ms`);
             }
