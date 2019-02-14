@@ -104,7 +104,7 @@ class HttpController {
             }
             // 3 ----- validate inputs object
             if (opConfig.validator) {
-                inputs = opConfig.validator(inputs);
+                inputs = opConfig.validator.call(operation, inputs);
             }
             // 4 ----- authenticate the request
             let auth = undefined;
@@ -138,10 +138,8 @@ class HttpController {
                 };
             }
             else {
-                const view = opConfig.view(result, viewOptions, {
-                    viewer: auth,
-                    timestamp: operation.timestamp
-                });
+                const viewContext = { auth, timestamp: operation.timestamp };
+                const view = opConfig.view.call(viewContext, result, viewOptions);
                 if (!view) {
                     response = {
                         status: 204 /* NoContent */,
@@ -248,16 +246,40 @@ function buildCorsHeaders(config, defaultCors) {
 function buildOpConfig(method, path, config, defaults, cors) {
     // determine view
     const view = config.view === undefined ? defaults.view : config.view;
+    if (view && !util.isRegularFunction(view)) {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: view builder must be a regular function`);
+    }
     // build headers
     let headers = cors;
     if (view) {
         headers = Object.assign({}, headers, { 'Content-Type': 'application/json' });
     }
+    // validate input parser
+    const parser = config.inputs;
+    if (parser && !util.isRegularFunction(parser)) {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: input parser must be a regular function`);
+    }
+    // validate input validator
+    const validator = config.schema;
+    if (validator && !util.isRegularFunction(validator)) {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: input validator must be a regular function`);
+    }
+    // TODO: implement schema validation using AJV
+    // validate authenticator
+    const authenticator = config.auth === undefined ? defaults.auth : config.auth;
+    if (authenticator && !util.isRegularFunction(authenticator)) {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: authenticator must be a regular function`);
+    }
+    // validate input mutator
+    const mutator = config.mutator === undefined ? defaults.mutator : config.mutator;
+    if (mutator && !util.isRegularFunction(mutator)) {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: input mutator must be a regular function`);
+    }
     // validate and build actions
     const actions = [];
     if (config.action) {
-        if (typeof config.action !== 'function') {
-            throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: action must be a function`);
+        if (!util.isRegularFunction(config.action)) {
+            throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: action must be a regular function`);
         }
         else if (config.actions) {
             throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: 'action' and 'actions' cannot be provided at the same time`);
@@ -268,8 +290,8 @@ function buildOpConfig(method, path, config, defaults, cors) {
     }
     else if (config.actions) {
         for (let action of config.actions) {
-            if (typeof action !== 'function') {
-                throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: all actions must be function`);
+            if (!util.isRegularFunction(action)) {
+                throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: all actions must be regular functions`);
             }
             else {
                 actions.push(action);
@@ -283,10 +305,10 @@ function buildOpConfig(method, path, config, defaults, cors) {
         headers: headers,
         options: config.options,
         defaults: Object.assign({}, defaults.inputs, config.defaults),
-        parser: config.inputs,
-        validator: config.schema,
-        authenticator: config.auth === undefined ? defaults.auth : config.auth,
-        mutator: config.mutator,
+        parser: parser,
+        validator: validator,
+        authenticator: authenticator,
+        mutator: mutator,
         actions: actions,
         view: view
     };

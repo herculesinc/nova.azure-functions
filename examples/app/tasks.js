@@ -10,7 +10,9 @@ module.exports = controller;
 // TASK HANDLERS
 // =================================================================================================
 controller.set('QueueTrigger', {
-    inputs  : (message, defaults, meta) => ({ message, defaults, meta }),
+    inputs  : async function (message, defaults, meta) { 
+        return { message, defaults, meta }; 
+    },
     action  : async function (inputs) {
         this.log.info(inputs);
     }

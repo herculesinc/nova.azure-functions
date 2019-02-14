@@ -7,6 +7,7 @@ import {
     Action, QueueControllerConfig, QueueTaskConfig, QueueInputProcessor, QueueOperationAdapter, QueueMessageMetadata
 } from '@nova/azure-functions';
 import { defaults } from './defaults';
+import * as util from './util';
 
 // INTERFACES
 // =================================================================================================
@@ -58,7 +59,7 @@ export class QueueController<O> {
             let actionInputs = undefined;
             if (opConfig.processor) {
                 const meta = buildMessageMetadata(context.bindingData as any);
-                actionInputs = opConfig.processor(message, opConfig.defaults, meta);
+                actionInputs = opConfig.processor.call(operation, message, opConfig.defaults, meta);
             }
             else {
                 actionInputs = message;
@@ -97,12 +98,11 @@ function processOptions(options: QueueControllerConfig): QueueControllerConfig {
 
 function buildOpConfig(functionName: string, taskConfig: QueueTaskConfig): OperationConfig<any> {
 
- 
     // validate and build actions
     const actions = [];
     if (taskConfig.action) {
-        if (typeof taskConfig.action !== 'function') { 
-            throw new TypeError(`Invalid definition for '${functionName}' task handler: action must be a function`);
+        if (!util.isRegularFunction(taskConfig.action)) { 
+            throw new TypeError(`Invalid definition for '${functionName}' task handler: action must be a regular function`);
         }
         else if (taskConfig.actions) {
             throw new TypeError(`Invalid definition for '${functionName}' task handler: 'action' and 'actions' cannot be provided at the same time`);
@@ -113,8 +113,8 @@ function buildOpConfig(functionName: string, taskConfig: QueueTaskConfig): Opera
     }
     else if (taskConfig.actions) {
         for (let action of taskConfig.actions) {
-            if (typeof action !== 'function') { 
-                throw new TypeError(`Invalid definition for '${functionName}' task handler: all actions must be function`);
+            if (!util.isRegularFunction(action)) { 
+                throw new TypeError(`Invalid definition for '${functionName}' task handler: all actions must be regular functions`);
             }
             else {
                 actions.push(action);
@@ -122,11 +122,16 @@ function buildOpConfig(functionName: string, taskConfig: QueueTaskConfig): Opera
         }
     }
 
+    const processor = taskConfig.inputs;
+    if (processor && !util.isRegularFunction(processor)) { 
+        throw new TypeError(`Invalid definition for '${functionName}' task handler: input processor must be a regular function`);
+    }
+
     return {
         functionName    : functionName,
         options         : taskConfig.options,
         defaults        : taskConfig.defaults,
-        processor       : taskConfig.inputs,
+        processor       : processor,
         actions         : actions
     };
 }

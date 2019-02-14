@@ -1,3 +1,5 @@
+/// <reference path="./typings/azure-functions.d.ts" />
+
 declare module "@nova/azure-functions" {
     
     // IMPORTS AND RE-EXPORTS
@@ -5,38 +7,7 @@ declare module "@nova/azure-functions" {
     import { Executable, Context, Action } from '@nova/core';
     export { Operation, Action, Logger, TraceSource, TraceCommand } from '@nova/core';
 
-    // AZURE FUNCTION INTERFACES
-    // --------------------------------------------------------------------------------------------
-    type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
-
-    export interface AzureFunctionContext {
-        readonly invocationId       : string;
-        readonly executionContext   : any;
-        readonly bindings           : { [key: string]: any; };
-        readonly bindingData?       : any;
-        readonly bindingDefinitions : any;
-        readonly log                : any;
-        done(error?: Error, response?: AzureHttpResponse): void;
-    }
-
-    export interface AzureHttpRequest {
-        
-        readonly method: HttpMethod;
-        readonly url: string;
-        readonly originalUrl: string;
-        readonly headers: { [header: string]: string; };
-        readonly query?: { [param: string]: string; };
-        readonly params?: { [param: string]: string; };
-        readonly body?: object | Buffer | string;
-        readonly rawBody?: string;
-    }
-
-    export interface AzureHttpResponse {
-        readonly status         : number;
-        readonly headers?       : { [header: string] : string; }
-        readonly body?          : object | Buffer;
-        readonly isRaw?         : boolean;    
-    }
+    import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
 
     // GLOBALS
     // --------------------------------------------------------------------------------------------
@@ -79,8 +50,9 @@ declare module "@nova/azure-functions" {
     export interface HttpEndpointDefaults {
         scope?      : string;
         cors?       : CorsOptions;
-        inputs?     : object;
+        inputs?     : any;
         auth?       : Authenticator;
+        mutator?    : HttpInputMutator;
         view?       : ViewBuilder;
     }
 
@@ -107,11 +79,11 @@ declare module "@nova/azure-functions" {
     }
 
     export interface HttpInputParser {
-        (this: Context, request: AzureHttpRequest, params?: any, defaults?: any): Promise<object>;
+        (this: Context, request: AzureHttpRequest, params?: any, defaults?: any): Promise<any>;
     }
 
     export interface HttpInputValidator {
-        (inputs: object): object;
+        (this: Context, inputs: any): any;
     }
 
     export interface HttpInputMutator {
@@ -119,8 +91,8 @@ declare module "@nova/azure-functions" {
     }
 
     export interface HttpInputMutatorResult {
-        action? : object;
-        view?   : object;
+        action? : any;
+        view?   : any;
     }
 
     export class HttpController {
@@ -151,7 +123,7 @@ declare module "@nova/azure-functions" {
     }
 
     export interface QueueInputProcessor {
-        (message: object, defaults: object, meta: QueueMessageMetadata): object;
+        (this: Context, message: any, defaults: any, meta: QueueMessageMetadata): any;
     }
 
     export interface QueueMessageMetadata {
@@ -193,7 +165,7 @@ declare module "@nova/azure-functions" {
 
         constructor(options?: TimerControllerConfig);
 
-        set(timerConfig: TimerHandlerConfig);
+        set(timerConfig: TimerHandlerConfig): void;
 
         handler(context: AzureFunctionContext, timer: any): Promise<void>;
     }
@@ -231,11 +203,11 @@ declare module "@nova/azure-functions" {
     // VIEWS
     // --------------------------------------------------------------------------------------------
     export interface ViewBuilder {
-        (result: any, options?: any, context?: ViewContext): any;
+        (this: ViewContext, result: any, options?: any): any;
     }
 
     export interface ViewContext {
-        viewer?     : any;      // TODO: change to auth?
+        auth?       : any;
         timestamp   : number;
     }
 

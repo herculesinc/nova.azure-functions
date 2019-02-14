@@ -77,3 +77,12 @@ export function matchIpV4(value: string): string {
     const result = value.match(IPV4_REGEX);
     if (result) return result[0];
 }
+
+// FUNCTION CHECKING
+// =================================================================================================
+export function isRegularFunction(fun: Function): boolean {
+    if (typeof fun !== 'function') return false;
+    
+    const definition = fun.toString();
+    return (definition.startsWith('function') || definition.startsWith('async function'));
+}

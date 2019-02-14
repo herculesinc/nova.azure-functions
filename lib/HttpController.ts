@@ -4,7 +4,7 @@ import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure
 import { Executable, Context } from '@nova/core';
 import { 
     Action, HttpControllerConfig, HttpOperationAdapter, HttpRouteConfig, HttpEndpointConfig, HttpEndpointDefaults,
-    Authenticator, HttpInputParser, HttpInputValidator, HttpInputMutator, ViewBuilder, StringBag, CorsOptions
+    Authenticator, HttpInputParser, HttpInputValidator, HttpInputMutator, ViewBuilder, StringBag, CorsOptions, ViewContext
 } from '@nova/azure-functions';
 import * as Router from 'find-my-way';
 import * as typeIs from 'type-is';
@@ -17,13 +17,13 @@ const JSON_CONTENT = ['application/json'];
 
 // INTERFACES
 // =================================================================================================
-interface OperationConfig<O> {
+interface OperationConfig {
     method          : string;
     path            : string;
     scope           : string;
     headers         : StringBag;
-    options         : O;
-    defaults        : object;
+    options         : any;
+    defaults        : any;
     parser          : HttpInputParser;
     validator       : HttpInputValidator;
     authenticator   : Authenticator;
@@ -38,7 +38,7 @@ const enum HttpStatusCode {
 
 // CLASS DEFINITION
 // =================================================================================================
-export class HttpController<O> {
+export class HttpController {
 
     private readonly routers    : Map<string,Router.Router>;
     private readonly adapter    : HttpOperationAdapter;
@@ -123,7 +123,7 @@ export class HttpController<O> {
         }
         
         let operation: Executable & Context = undefined;
-        const opConfig = route.store as OperationConfig<O>;
+        const opConfig = route.store as OperationConfig;
         try {
             // 1 ----- create operation context
             const reqHead = {
@@ -158,7 +158,7 @@ export class HttpController<O> {
 
             // 3 ----- validate inputs object
             if (opConfig.validator) {
-                inputs = opConfig.validator(inputs);
+                inputs = opConfig.validator.call(operation, inputs);
             }
 
             // 4 ----- authenticate the request
@@ -197,10 +197,8 @@ export class HttpController<O> {
             }
             else {
 
-                const view = opConfig.view(result, viewOptions, {
-                    viewer      : auth,
-                    timestamp   : operation.timestamp
-                });
+                const viewContext: ViewContext = { auth, timestamp: operation.timestamp };
+                const view = opConfig.view.call(viewContext, result, viewOptions);
 
                 if (!view) {
                     response =  {
@@ -310,10 +308,13 @@ function buildCorsHeaders(config: HttpRouteConfig, defaultCors: CorsOptions) {
     };
 }
 
-function buildOpConfig(method: string, path: string, config: HttpEndpointConfig, defaults: HttpEndpointDefaults, cors: StringBag): OperationConfig<any> {
+function buildOpConfig(method: string, path: string, config: HttpEndpointConfig, defaults: HttpEndpointDefaults, cors: StringBag): OperationConfig {
 
     // determine view
     const view = config.view === undefined ? defaults.view : config.view;
+    if (view && !util.isRegularFunction(view)) {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: view builder must be a regular function`);
+    }
 
     // build headers
     let headers = cors;
@@ -321,11 +322,36 @@ function buildOpConfig(method: string, path: string, config: HttpEndpointConfig,
         headers = { ...headers, 'Content-Type': 'application/json' };
     }
 
+    // validate input parser
+    const parser = config.inputs;
+    if (parser && !util.isRegularFunction(parser)) {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: input parser must be a regular function`);
+    }
+
+    // validate input validator
+    const validator = config.schema;
+    if (validator && !util.isRegularFunction(validator)) {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: input validator must be a regular function`);
+    }
+    // TODO: implement schema validation using AJV
+
+    // validate authenticator
+    const authenticator = config.auth === undefined ? defaults.auth : config.auth;
+    if (authenticator && !util.isRegularFunction(authenticator)) {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: authenticator must be a regular function`);
+    }
+
+    // validate input mutator
+    const mutator = config.mutator === undefined ? defaults.mutator : config.mutator;
+    if (mutator && !util.isRegularFunction(mutator)) {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: input mutator must be a regular function`);
+    }
+
     // validate and build actions
     const actions = [];
     if (config.action) {
-        if (typeof config.action !== 'function') { 
-            throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: action must be a function`);
+        if (!util.isRegularFunction(config.action)) { 
+            throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: action must be a regular function`);
         }
         else if (config.actions) {
             throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: 'action' and 'actions' cannot be provided at the same time`);
@@ -336,8 +362,8 @@ function buildOpConfig(method: string, path: string, config: HttpEndpointConfig,
     }
     else if (config.actions) {
         for (let action of config.actions) {
-            if (typeof action !== 'function') { 
-                throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: all actions must be function`);
+            if (!util.isRegularFunction(action)) { 
+                throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: all actions must be regular functions`);
             }
             else {
                 actions.push(action);
@@ -352,10 +378,10 @@ function buildOpConfig(method: string, path: string, config: HttpEndpointConfig,
         headers         : headers,
         options         : config.options,
         defaults        : { ...defaults.inputs, ...config.defaults },
-        parser          : config.inputs,
-        validator       : config.schema,    // TODO: check defaults?
-        authenticator   : config.auth === undefined ? defaults.auth : config.auth,
-        mutator         : config.mutator,   // TODO: check defaults?
+        parser          : parser,
+        validator       : validator,
+        authenticator   : authenticator,
+        mutator         : mutator,
         actions         : actions,
         view            : view
     };

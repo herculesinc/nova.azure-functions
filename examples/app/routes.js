@@ -26,18 +26,18 @@ controller.set('HttpTrigger', '/', {
         action  : async function (inputs) {
             return { action: 'GET /', name: this.name, inputs };
         },
-        view    : (result, options) => { 
+        view    : function (result, options) { 
             return { result, options, context: this }; 
-        } 
+        }
     },
     post: {
         scope   : 'account:update',
-        auth    : async (scope, credentials) => credentials.data,
-        action  : async inputs => ({ action: 'POST /', inputs }),
-        view    : (result, options, context) => ({ result, options, context })
+        auth    : async function (scope, credentials) { return credentials.data; },
+        action  : async function (inputs) { return { action: 'POST /', inputs }; },
+        view    : function (result, options) { return { result, options, context: this }; }
     },
     put: {
-        action  : async (inputs) => {
+        action  : async function (inputs) {
 
             this.log.debug('Debug text');
             this.log.info('Info text');
@@ -73,21 +73,23 @@ controller.set('HttpTrigger', '/', {
 controller.set('HttpTrigger', '/multipart', {
     post: {
         inputs  : nova.parsers.multipart({ filter: { field: 'field3', maxCount: 1 }}),
-        action  : async inputs => ({ action: 'POST /multipart', inputs })
+        action  : async function (inputs) {
+            return { action: 'POST /multipart', inputs };
+        }
     }
 });
 
 controller.set('HttpTrigger', '/view', {
     get: {
-        action  : (inputs) => { 
+        action  : async function (inputs) { 
             return {
                 action  : 'GET /view',
                 name    : this.name,
                 inputs 
             };
         },
-        view    : (result, options, context) => {
-            const view = { result, context };
+        view    : function (result, options) {
+            const view = { result, context: this };
             view[nova.symbols.responseHeaders] = { 'Test-Header': 'test value' };
             return view;
         }

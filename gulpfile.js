@@ -20,11 +20,11 @@ function compile(cb) {
 }
 
 function copyFiles(cb) {
-  gulp.src('./package.json').pipe(gulp.dest('./bin'));
-  gulp.src('./package-lock.json').pipe(gulp.dest('./bin'));
+  gulp.src(['./package.json', './package-lock.json']).pipe(gulp.dest('./bin'));
   gulp.src('./nova-azure-functions.d.ts').pipe(gulp.dest('./bin'));
   gulp.src('./.npmignore').pipe(gulp.dest('./bin'));
   gulp.src('./README.md').pipe(gulp.dest('./bin'));
+  gulp.src(['./typings/azure-functions.d.ts']).pipe(gulp.dest('./bin/typings'));
   cb();
 }
 

@@ -5,6 +5,7 @@ import { AzureFunctionContext } from 'azure-functions';
 import { Executable, Context } from '@nova/core';
 import { Action, TimerControllerConfig, TimerHandlerConfig, TimerOperationAdapter } from '@nova/azure-functions';
 import { defaults } from './defaults';
+import * as util from './util';
 
 // INTERFACES
 // =================================================================================================
@@ -84,12 +85,11 @@ function processOptions(options: TimerControllerConfig): TimerControllerConfig {
 
 function buildOpConfig(functionName: string, taskConfig: TimerHandlerConfig): OperationConfig<any> {
 
- 
     // validate and build actions
     const actions = [];
     if (taskConfig.action) {
-        if (typeof taskConfig.action !== 'function') { 
-            throw new TypeError(`Invalid definition for '${functionName}' timer handler: action must be a function`);
+        if (!util.isRegularFunction(taskConfig.action)) { 
+            throw new TypeError(`Invalid definition for '${functionName}' timer handler: action must be a regular function`);
         }
         else if (taskConfig.actions) {
             throw new TypeError(`Invalid definition for '${functionName}' timer handler: 'action' and 'actions' cannot be provided at the same time`);
@@ -100,8 +100,8 @@ function buildOpConfig(functionName: string, taskConfig: TimerHandlerConfig): Op
     }
     else if (taskConfig.actions) {
         for (let action of taskConfig.actions) {
-            if (typeof action !== 'function') { 
-                throw new TypeError(`Invalid definition for '${functionName}' timer handler: all actions must be function`);
+            if (!util.isRegularFunction(action)) { 
+                throw new TypeError(`Invalid definition for '${functionName}' timer handler: all actions must be regular functions`);
             }
             else {
                 actions.push(action);

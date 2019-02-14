@@ -74,4 +74,13 @@ function matchIpV4(value) {
         return result[0];
 }
 exports.matchIpV4 = matchIpV4;
+// FUNCTION CHECKING
+// =================================================================================================
+function isRegularFunction(fun) {
+    if (typeof fun !== 'function')
+        return false;
+    const definition = fun.toString();
+    return (definition.startsWith('function') || definition.startsWith('async function'));
+}
+exports.isRegularFunction = isRegularFunction;
 //# sourceMappingURL=util.js.map
