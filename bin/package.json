@@ -27,12 +27,14 @@
     "node": "10.15.x"
   },
   "dependencies": {
+    "@nova/core": "0.1.x",
     "ajv": "6.5.x",
     "busboy": "0.2.x",
     "find-my-way": "1.15.x",
     "type-is": "1.6.x"
   },
   "devDependencies": {
+    "@types/node": "10.12.x",
     "del": "3.0.x",
     "gulp": "4.0.x"
   }

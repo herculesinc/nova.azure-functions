@@ -1,5 +1,3 @@
-/// <reference path="../node/node.d.ts" />
-
 declare module "type-is" {
     import http = require("http");
 
