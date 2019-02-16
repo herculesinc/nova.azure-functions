@@ -130,7 +130,7 @@ class HttpController {
             const result = await operation.execute(actionInputs);
             // 7 ----- build the response
             let response;
-            if (!result || !opConfig.view) {
+            if (!opConfig.view) {
                 response = {
                     status: 204 /* NoContent */,
                     headers: opConfig.headers,
@@ -142,7 +142,7 @@ class HttpController {
                 const view = opConfig.view.call(viewContext, result, viewOptions);
                 if (!view) {
                     response = {
-                        status: 204 /* NoContent */,
+                        status: 404 /* NotFound */,
                         headers: opConfig.headers,
                         body: null
                     };

@@ -1,7 +1,7 @@
 // IMPORTS
 // =================================================================================================
 import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
-import { Executable, Context } from '@nova/core';
+import { Executable, Context, HttpStatusCode } from '@nova/core';
 import { 
     Action, HttpControllerConfig, HttpOperationAdapter, HttpRouteConfig, HttpEndpointConfig, HttpEndpointDefaults,
     Authenticator, HttpInputParser, HttpInputValidator, HttpInputMutator, ViewBuilder, StringBag, CorsOptions, ViewContext
@@ -30,10 +30,6 @@ interface OperationConfig {
     mutator         : HttpInputMutator;
     actions         : Action[];
     view            : ViewBuilder;
-}
-
-const enum HttpStatusCode {
-    OK = 200, NoContent = 204, InternalServerError = 500
 }
 
 // CLASS DEFINITION
@@ -188,7 +184,7 @@ export class HttpController {
 
             // 7 ----- build the response
             let response: AzureHttpResponse;
-            if (!result || !opConfig.view) {
+            if (!opConfig.view) {
                 response = {
                     status  : HttpStatusCode.NoContent,
                     headers : opConfig.headers,
@@ -202,7 +198,7 @@ export class HttpController {
 
                 if (!view) {
                     response =  {
-                        status  : HttpStatusCode.NoContent,
+                        status  : HttpStatusCode.NotFound,
                         headers : opConfig.headers,
                         body    : null
                     };

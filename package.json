@@ -27,7 +27,7 @@
     "node": "10.15.x"
   },
   "dependencies": {
-    "@nova/core": "^0.1.2",
+    "@nova/core": "0.2.x",
     "ajv": "6.5.x",
     "busboy": "0.2.x",
     "find-my-way": "1.15.x",
