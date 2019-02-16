@@ -119,7 +119,7 @@ class HttpController {
             // 5 ----- split inputs into action inputs and view options
             let actionInputs = undefined, viewOptions = undefined;
             if (opConfig.mutator) {
-                const result = await opConfig.mutator.call(operation, inputs, auth);
+                const result = opConfig.mutator.call(operation, inputs, auth);
                 actionInputs = result.action;
                 viewOptions = result.view;
             }

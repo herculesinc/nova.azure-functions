@@ -8,6 +8,7 @@ declare module "@nova/azure-functions" {
     export { Operation, Action, Logger, TraceSource, TraceCommand } from '@nova/core';
 
     import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
+    export { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
 
     // GLOBALS
     // --------------------------------------------------------------------------------------------
@@ -87,7 +88,7 @@ declare module "@nova/azure-functions" {
     }
 
     export interface HttpInputMutator {
-        (this: Context, inputs: any, auth?: any): Promise<HttpInputMutatorResult>;
+        (this: Context, inputs: any, auth?: any): HttpInputMutatorResult;
     }
 
     export interface HttpInputMutatorResult {
@@ -213,8 +214,8 @@ declare module "@nova/azure-functions" {
 
     // AUTHENTICATOR
     // --------------------------------------------------------------------------------------------
-    export interface Authenticator {
-        (this: Context, scope: string, credentials: Credentials): Promise<any>;
+    export interface Authenticator<T=any> {
+        (this: Context, scope: string, credentials: Credentials): Promise<T>;
     }
 
     export interface Credentials {
@@ -238,29 +239,10 @@ declare module "@nova/azure-functions" {
 
 declare module '@nova/core' {
 
-    export interface TraceSource {
-        readonly name   : string;
-        readonly type   : string;
-    }
-
-    export interface TraceCommand {
-        readonly name   : string;
-        readonly text?  : string;
-    }
-
     export interface Logger {
 
         readonly operationId    : string;
         authenticatedUserId?    : string;
-
-        debug(message: string)  : void;
-        info(message: string)   : void;
-        warn(message: string)   : void;
-
-        error(error: Error)     : void;
-
-        trace(source: TraceSource, command: string, duration: number, success: boolean): void;
-        trace(source: TraceSource, command: TraceCommand, duration: number, success: boolean): void;
 
         close(resultCode: number, success: boolean, properties?: { [key: string]: string; } ): void;
     }
