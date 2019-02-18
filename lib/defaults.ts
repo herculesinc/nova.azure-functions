@@ -1,6 +1,6 @@
 // IMPORTS
 // =================================================================================================
-import { Operation } from '@nova/core';
+import { Operation, HttpStatusCode } from '@nova/core';
 import { AzureHttpResponse, AzureFunctionContext } from 'azure-functions';
 import {
     HttpControllerConfig, HttpRequestHead, MultipartDefaults, Action,
@@ -24,7 +24,8 @@ interface Defaults {
 export const defaults: Defaults = {
     httpController: {
         adapter             : defaultHttpOperationAdapter,
-        rethrowThreshold    : 500,
+        routerOptions       : undefined,    // using find-my-way defaults
+        rethrowThreshold    : HttpStatusCode.InternalServerError,
         defaults: {
             cors: {
                 origin      : '*',
@@ -43,15 +44,15 @@ export const defaults: Defaults = {
     },
     multipartParser         : { },  // using busboy defaults
     notFoundResponse: {
-        status              : 404,
+        status              : HttpStatusCode.NotFound,
         body                : null 
     },
     invalidContentResponse: {
-        status              : 415,
+        status              : HttpStatusCode.UnsupportedContent,
         body                : null 
     },
     invalidAuthHeaderResponse: {
-        status              : 420,
+        status              : HttpStatusCode.Unauthorized,
         body                : null
     }
 }

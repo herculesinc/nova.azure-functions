@@ -43,7 +43,7 @@ export class HttpController {
     private readonly routerOptions      : Router.RouterConfig;
     private readonly rethrowThreshold   : number;
 
-    constructor(options?: HttpControllerConfig) {
+    constructor(options?: Partial<HttpControllerConfig>) {
         options = processOptions(options);
 
         this.routers = new Map();
@@ -122,14 +122,14 @@ export class HttpController {
         const opConfig = route.store as OperationConfig;
         try {
             // 1 ----- create operation context
-            const reqHead = {
+            const requestHead = {
                 route   : opConfig.path,
                 method  : request.method,
                 headers : request.headers,
                 ip      : util.getIpAddress(request.headers),
                 url     : request.originalUrl
             };
-            operation = this.adapter(context, reqHead, opConfig.actions, opConfig.options);
+            operation = this.adapter(context, requestHead, opConfig.actions, opConfig.options);
 
             // 2 ----- transform request into inputs object
             let inputs = undefined;
@@ -246,9 +246,20 @@ export class HttpController {
 
 // HELPER FUNCTIONS
 // =================================================================================================
-function processOptions(options: HttpControllerConfig): HttpControllerConfig {
-    if (!options) return defaults.httpController;
+function processOptions(options?: Partial<HttpControllerConfig>): HttpControllerConfig {
+    if (!options) {
+        return {
+            adapter         : defaults.httpController.adapter,
+            routerOptions   : defaults.httpController.routerOptions,
+            rethrowThreshold: defaults.httpController.rethrowThreshold,
+            defaults: {
+                ...defaults.httpController.defaults,
+                cors: { ...defaults.httpController.defaults.cors }
+            },
+        };
+    };
 
+    // build controller config
     const newOptions: HttpControllerConfig = {
         adapter         : options.adapter || defaults.httpController.adapter,
         routerOptions   : options.routerOptions,
@@ -256,14 +267,16 @@ function processOptions(options: HttpControllerConfig): HttpControllerConfig {
         defaults        : undefined,
     };
 
+    // set default endpoint options
     if (options.defaults) {
-        newOptions.defaults = { ...defaults.httpController.defaults, ...options.defaults, ...{
-            cors    : { ...defaults.httpController.defaults.cors, ...options.defaults.cors },
-            inputs  : { ...defaults.httpController.defaults.inputs, ...options.defaults.inputs }
-        } };
+        newOptions.defaults = { 
+            ...defaults.httpController.defaults, 
+            ...options.defaults,
+            cors: { ...defaults.httpController.defaults.cors, ...options.defaults.cors }
+        };
     }
     else {
-        newOptions.defaults = defaults.httpController.defaults;
+        newOptions.defaults = { ...defaults.httpController.defaults };
     }
 
     return newOptions;
@@ -373,7 +386,7 @@ function buildOpConfig(method: string, path: string, config: HttpEndpointConfig,
         scope           : config.scope === undefined ? defaults.scope : config.scope,
         headers         : headers,
         options         : config.options,
-        defaults        : { ...defaults.inputs, ...config.defaults },
+        defaults        : { ...config.defaults },
         parser          : parser,
         validator       : validator,
         authenticator   : authenticator,

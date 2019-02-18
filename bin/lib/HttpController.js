@@ -73,14 +73,14 @@ class HttpController {
         const opConfig = route.store;
         try {
             // 1 ----- create operation context
-            const reqHead = {
+            const requestHead = {
                 route: opConfig.path,
                 method: request.method,
                 headers: request.headers,
                 ip: util.getIpAddress(request.headers),
                 url: request.originalUrl
             };
-            operation = this.adapter(context, reqHead, opConfig.actions, opConfig.options);
+            operation = this.adapter(context, requestHead, opConfig.actions, opConfig.options);
             // 2 ----- transform request into inputs object
             let inputs = undefined;
             if (opConfig.parser) {
@@ -186,22 +186,28 @@ exports.HttpController = HttpController;
 // HELPER FUNCTIONS
 // =================================================================================================
 function processOptions(options) {
-    if (!options)
-        return defaults_1.defaults.httpController;
+    if (!options) {
+        return {
+            adapter: defaults_1.defaults.httpController.adapter,
+            routerOptions: defaults_1.defaults.httpController.routerOptions,
+            rethrowThreshold: defaults_1.defaults.httpController.rethrowThreshold,
+            defaults: Object.assign({}, defaults_1.defaults.httpController.defaults, { cors: Object.assign({}, defaults_1.defaults.httpController.defaults.cors) }),
+        };
+    }
+    ;
+    // build controller config
     const newOptions = {
         adapter: options.adapter || defaults_1.defaults.httpController.adapter,
         routerOptions: options.routerOptions,
         rethrowThreshold: options.rethrowThreshold || defaults_1.defaults.httpController.rethrowThreshold,
         defaults: undefined,
     };
+    // set default endpoint options
     if (options.defaults) {
-        newOptions.defaults = Object.assign({}, defaults_1.defaults.httpController.defaults, options.defaults, {
-            cors: Object.assign({}, defaults_1.defaults.httpController.defaults.cors, options.defaults.cors),
-            inputs: Object.assign({}, defaults_1.defaults.httpController.defaults.inputs, options.defaults.inputs)
-        });
+        newOptions.defaults = Object.assign({}, defaults_1.defaults.httpController.defaults, options.defaults, { cors: Object.assign({}, defaults_1.defaults.httpController.defaults.cors, options.defaults.cors) });
     }
     else {
-        newOptions.defaults = defaults_1.defaults.httpController.defaults;
+        newOptions.defaults = Object.assign({}, defaults_1.defaults.httpController.defaults);
     }
     return newOptions;
 }
@@ -304,7 +310,7 @@ function buildOpConfig(method, path, config, defaults, cors) {
         scope: config.scope === undefined ? defaults.scope : config.scope,
         headers: headers,
         options: config.options,
-        defaults: Object.assign({}, defaults.inputs, config.defaults),
+        defaults: Object.assign({}, config.defaults),
         parser: parser,
         validator: validator,
         authenticator: authenticator,

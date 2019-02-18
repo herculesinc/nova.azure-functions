@@ -8,7 +8,8 @@ const core_1 = require("@nova/core");
 exports.defaults = {
     httpController: {
         adapter: defaultHttpOperationAdapter,
-        rethrowThreshold: 500,
+        routerOptions: undefined,
+        rethrowThreshold: 500 /* InternalServerError */,
         defaults: {
             cors: {
                 origin: '*',
@@ -27,15 +28,15 @@ exports.defaults = {
     },
     multipartParser: {},
     notFoundResponse: {
-        status: 404,
+        status: 404 /* NotFound */,
         body: null
     },
     invalidContentResponse: {
-        status: 415,
+        status: 415 /* UnsupportedContent */,
         body: null
     },
     invalidAuthHeaderResponse: {
-        status: 420,
+        status: 401 /* Unauthorized */,
         body: null
     }
 };

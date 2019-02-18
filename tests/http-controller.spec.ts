@@ -39,13 +39,13 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             expect((controller as any).adapter).to.equal(defaults.httpController.adapter);
 
-            expect((controller as any).defaults).to.deep.equal(defaults.httpController.defaults);
             expect((controller as any).defaults).to.not.equal(defaults.httpController.defaults);
+            expect((controller as any).defaults).to.deep.equal(defaults.httpController.defaults);
             expect((controller as any).defaults.cors).to.not.equal(defaults.httpController.defaults.cors);
         });
 
         it('should provide custom adapter to new controller', () => {
-            const options: HttpControllerConfig = {
+            const options: Partial<HttpControllerConfig> = {
                 adapter: mockAdapter
             };
 
@@ -61,7 +61,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                 maxParamLength     : false,
                 allowUnsafeRegex   : true
             };
-            const options: HttpControllerConfig = {
+            const options: Partial<HttpControllerConfig> = {
                 routerOptions
             };
 
@@ -88,7 +88,6 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
             const defaultsOptions: HttpEndpointDefaults = {
                 scope  : 'scope',
                 cors   : cors,
-                inputs : {foo: 'bar'},
                 auth   : (): Promise<any> => (Promise.resolve()),
                 mutator: (): HttpInputMutatorResult => ({}),
                 view   : (): void => undefined
@@ -111,11 +110,6 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     expect((controller as any).defaults.cors[key]).to.equal(defaults.httpController.defaults.cors[key]);
                 }
             });
-
-            // inputs
-            expect((controller as any).defaults.inputs).to.not.equal(defaults.httpController.defaults.inputs);
-            expect((controller as any).defaults.inputs).to.not.equal(defaultsOptions.inputs);
-            expect((controller as any).defaults.inputs).to.deep.equal(defaultsOptions.inputs);
 
             // view
             expect((controller as any).defaults.view).to.equal(defaultsOptions.view);
@@ -214,7 +208,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
         });
     });
 
-    describe.only('Executing \'HttpController.handler()\' method', () => {
+    describe('Executing \'HttpController.handler()\' method', () => {
         let controller: HttpController;
         let config: HttpRouteConfig;
         let action: any;

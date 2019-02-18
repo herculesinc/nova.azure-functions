@@ -24,10 +24,10 @@ declare module "@nova/azure-functions" {
     // HTTP CONTROLLER
     // --------------------------------------------------------------------------------------------
     export interface HttpControllerConfig {
-        adapter?            : HttpOperationAdapter;
-        routerOptions?      : HttpRouterConfig;
-        rethrowThreshold?   : number;
-        defaults?           : HttpEndpointDefaults;
+        adapter             : HttpOperationAdapter;
+        routerOptions       : HttpRouterConfig;
+        rethrowThreshold    : number;
+        defaults            : HttpEndpointDefaults;
     }
 
     export interface HttpRouterConfig {
@@ -51,7 +51,6 @@ declare module "@nova/azure-functions" {
     export interface HttpEndpointDefaults {
         scope?      : string;
         cors?       : CorsOptions;
-        inputs?     : any;
         auth?       : Authenticator;
         mutator?    : HttpInputMutator;
         view?       : ViewBuilder;
