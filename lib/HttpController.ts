@@ -2,7 +2,7 @@
 // =================================================================================================
 import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
 import { Executable, Context, HttpStatusCode } from '@nova/core';
-import { 
+import {
     Action, HttpControllerConfig, HttpOperationAdapter, HttpRouteConfig, HttpEndpointConfig, HttpEndpointDefaults,
     Authenticator, HttpInputParser, HttpInputValidator, HttpInputMutator, ViewBuilder, StringBag, CorsOptions, ViewContext
 } from '@nova/azure-functions';
@@ -117,7 +117,7 @@ export class HttpController {
                 body    : null
             };
         }
-        
+
         let operation: Executable & Context = undefined;
         const opConfig = route.store as OperationConfig;
         try {
@@ -165,7 +165,7 @@ export class HttpController {
                     // auth header could not be parsed
                     return defaults.invalidAuthHeaderResponse;
                 }
-                auth = await opConfig.authenticator.call(operation, opConfig.scope, credentials); 
+                auth = await opConfig.authenticator.call(operation, opConfig.scope, credentials);
             }
 
             // 5 ----- split inputs into action inputs and view options
@@ -177,7 +177,7 @@ export class HttpController {
             }
             else {
                 actionInputs = inputs;
-            }            
+            }
 
             // 6 ----- execute actions
             const result = await operation.execute(actionInputs);
@@ -237,7 +237,7 @@ export class HttpController {
                 const body = error.toJSON
                     ? error.toJSON()
                     : { name: error.name, message: error.message };
-            
+
                 return { status, headers, body };
             }
         }
@@ -346,7 +346,7 @@ function buildOpConfig(method: string, path: string, config: HttpEndpointConfig,
     // validate and build actions
     const actions = [];
     if (config.action) {
-        if (!util.isRegularFunction(config.action)) { 
+        if (!util.isRegularFunction(config.action)) {
             throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: action must be a regular function`);
         }
         else if (config.actions) {
@@ -358,7 +358,7 @@ function buildOpConfig(method: string, path: string, config: HttpEndpointConfig,
     }
     else if (config.actions) {
         for (let action of config.actions) {
-            if (!util.isRegularFunction(action)) { 
+            if (!util.isRegularFunction(action)) {
                 throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: all actions must be regular functions`);
             }
             else {

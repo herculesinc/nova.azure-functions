@@ -1,0 +1,1 @@
+export { mockAdapter } from './adapter';

@@ -34,8 +34,14 @@
     "type-is": "1.6.x"
   },
   "devDependencies": {
+    "@types/mocha": "5.2.x",
     "@types/node": "10.12.x",
+    "chai": "3.5.x",
+    "chai-as-promised": "7.1.x",
     "del": "3.0.x",
-    "gulp": "4.0.x"
+    "gulp": "4.0.x",
+    "gulp-mocha": "6.0.x",
+    "mocha": "5.2.x",
+    "sinon": "1.17.x"
   }
 }
