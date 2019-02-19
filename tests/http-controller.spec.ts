@@ -2,26 +2,25 @@ import * as chai from 'chai';
 import * as sinon from 'sinon';
 
 import {
-    Authenticator,
     CorsOptions,
     HttpControllerConfig,
-    HttpEndpointDefaults, HttpInputMutator,
-    HttpInputMutatorResult, HttpInputParser, HttpInputValidator,
+    HttpEndpointDefaults,
+    HttpInputMutatorResult,
     HttpRouteConfig,
-    HttpRouterConfig, ViewBuilder
+    HttpRouterConfig
 } from '@nova/azure-functions';
 import {
-    AzureExecutionContext,
     AzureFunctionContext,
-    AzureFunctionLogger,
-    AzureHttpRequest,
-    AzureHttpResponse
+    AzureHttpRequest
 } from 'azure-functions';
 import { defaults } from '../lib/defaults';
-import { HttpController } from '../index';
-import { mockAdapter } from './mocks';
+import { HttpController, symbols } from '../index';
+import { AzureFuncContext, AzureHttpReq, mockAdapter } from './mocks';
 
 const expect = chai.expect;
+
+const toStringFn = () => 'function';
+const functionName = 'test';
 
 describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
     describe('Creating an \'HttpController\';', () => {
@@ -125,19 +124,21 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
         let controller: HttpController;
         let action: any;
 
-        describe('should register new route', () => {
+        const route = '/test';
+
+        describe('should register new route for method', () => {
             beforeEach(() => {
                 controller = new HttpController();
                 action = function(): Promise<any> {return Promise.resolve()}
             });
 
             ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
-                it(`for method '${method.toUpperCase()}'`, () => {
+                it(method.toUpperCase(), () => {
                     const config: HttpRouteConfig = {
                         [method]: { action }
                     };
 
-                    expect(() => controller.set('test', '/', config)).to.not.throw();
+                    expect(() => controller.set('test', route, config)).to.not.throw();
                 });
             });
         });
@@ -150,18 +151,20 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             describe('for unsupported method', () => {
                 ['option', 'test'].forEach(method => {
-                    it(method.toUpperCase(), () => {
-                        const METHOD = method.toUpperCase();
-                        expect(() => controller.set('test', '/', {[method]: {action}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${METHOD} /' endpoint: '${METHOD}' method is not supported`);
+                    const uMethod = method.toUpperCase();
+
+                    it(uMethod, () => {
+                        expect(() => controller.set('test', route, {[method]: {action}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: '${uMethod}' method is not supported`);
                     });
                 });
             });
 
             describe('when action/actions is not provided for method', () => {
                 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
-                    it(method.toUpperCase(), () => {
-                        const METHOD = method.toUpperCase();
-                        expect(() => controller.set('test', '/', {[method]: {}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${METHOD} /' endpoint: no actions were provided`);
+                    const uMethod = method.toUpperCase();
+
+                    it(uMethod, () => {
+                        expect(() => controller.set('test', route, {[method]: {}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: no actions were provided`);
                     });
                 });
             });
@@ -173,15 +176,17 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                             [method]: { action }
                         };
 
-                        expect(() => controller.set('test', '/', config)).to.not.throw();
-                        expect(() => controller.set('test', '/', config)).to.throw(TypeError, `Invalid definition for '/' endpoint: conflicting endpoint handler found`);
+                        expect(() => controller.set('test', route, config)).to.not.throw();
+                        expect(() => controller.set('test', route, config)).to.throw(TypeError, `Invalid definition for '${route}' endpoint: conflicting endpoint handler found`);
                     });
                 });
             });
 
             describe('when action and actions provided at the same time for method', () => {
                 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
-                    it(method.toUpperCase(), () => {
+                    const uMethod = method.toUpperCase();
+
+                    it(uMethod, () => {
                         const config: HttpRouteConfig = {
                             [method]: {
                                 action,
@@ -189,21 +194,23 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                             }
                         };
 
-                        expect(() => controller.set('test', '/', config)).to.throw(TypeError, `Invalid definition for '${method.toUpperCase()} /' endpoint: 'action' and 'actions' cannot be provided at the same time`);
+                        expect(() => controller.set('test', route, config)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: 'action' and 'actions' cannot be provided at the same time`);
                     });
                 });
             });
 
             describe('when action and actions provided at the same time for method', () => {
                 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
-                    it(method.toUpperCase(), () => {
+                    const uMethod = method.toUpperCase();
+
+                    it(uMethod, () => {
                         const config: HttpRouteConfig = {
                             [method]: {
                                 action: (): Promise<any> => Promise.resolve()
                             }
                         };
 
-                        expect(() => controller.set('test', '/', config)).to.throw(TypeError, `Invalid definition for '${method.toUpperCase()} /' endpoint: action must be a regular function`);
+                        expect(() => controller.set('test', route, config)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: action must be a regular function`);
                     });
                 });
             });
@@ -213,78 +220,599 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
     describe('Executing \'HttpController.handler()\' method', () => {
         let controller: HttpController;
         let config: HttpRouteConfig;
-        let action: any;
         let context: AzureFunctionContext;
         let request: AzureHttpRequest;
+        let result: any;
+        let error: any;
 
-        const functionName = 'test';
-
-        beforeEach(() => {
-            action = function(): Promise<any> {return Promise.resolve({test: false})};
-            controller = new HttpController();
-
-            config = { get: { action } };
-
-            controller.set(functionName, '/', config);
-
-            const logger = function(message: string) {
-
-            };
-
-            (logger as any).verbose = () => {};
-            (logger as any).info = () => {};
-            (logger as any).error = () => {};
-            (logger as any).warn = () => {};
-
-            context = {
-                invocationId      : 'invocationId',
-                executionContext  : {
-                    invocationId     : 'invocationId',
-                    functionName     : functionName,
-                    functionDirectory: 'functionDirectory'
-                },
-                bindingDefinitions: [],
-                bindings          : {},
-                log               : logger as AzureFunctionLogger,
-                done              : (error?: Error, response?: AzureHttpResponse): void => undefined
-            };
-
-            request = {
-                method     : 'GET',
-                url        : 'http://test.com',
-                originalUrl: 'http://test.com',
-                headers    : {'content-type': 'application/json'},
-                query      : {foo: 'bar'},
-                params     : {route: ''},
-                body       : {}
-            };
+        afterEach(() => {
+            result = error = undefined;
         });
 
-        it('should ', async () => {
-            try {
-                const result = await controller.handler(context, request );
+        it('should execute handler() method without errors', async () => {
+            const actionResult = {test: false};
 
-                console.log(result)
+            try {
+                const action = function(): Promise<any> {return Promise.resolve(actionResult)};
+
+                controller = new HttpController();
+                config = { get: { action } };
+                request = new AzureHttpReq('GET', 'http://test.com');
+                context = new AzureFuncContext('id', functionName);
+
+                controller.set(functionName, '/', config);
+
+                const {status, body} = await controller.handler(context, request );
+
+                expect(status).to.equal(200);
+                expect(body).to.deep.equal(actionResult);
             } catch (err) {
-                expect(err.message).to.equal('exception');
+                expect(err.message).to.equal('should not have an error');
             }
         });
 
-        // request -> inputs -> chain -> result;
-        // defaults.value -> inputs -> results;
-        // auth header -> parser;
+        describe('passing of data through all handlers (parser -> validator -> authenticator -> mutator -> action -> view);', () => {
+            let parserSpy: any;
+            let validatorSpy: any;
+            let authenticatorSpy: any;
+            let mutatorSpy: any;
+            let actionSpy: any;
+            let viewSpy: any;
 
-        /*
-        scope?      : string; -> auth
-        options?    : any; -> adapter
-        defaults?   : any; -> inputs or schema
-        inputs?     : HttpInputParser;
-        schema?     : HttpInputValidator; ->
-        auth?       : Authenticator;
-        mutator?    : HttpInputMutator;
-        action?     : Action;
-        actions?    : Action[];
-        view?       : ViewBuilder;
-        */
+            const id = 'params';
+
+            const optDefaults = {
+                query : false,
+                params: false,
+                body  : false
+            };
+            const requestQuery = {query: 'query'};
+            const requestBody = {body: 'body'};
+            const headers = {authorization: 'key value'};
+
+            const parserResult = {parser: true};
+            const validatorResults = {validator: true};
+            const authenticatorResults = {authenticator: true};
+            const mutatorResults = {action: {actionMutated: true}, view: {viewMutated: true}};
+            const actionResult = {action: true};
+            const viewResult = {view: true};
+
+            beforeEach(async () => {
+                controller = new HttpController();
+                context = new AzureFuncContext('id', functionName);
+                request = new AzureHttpReq('GET', `http://test.com/${id}`, headers, requestQuery, requestBody);
+
+                parserSpy = sinon.stub().returns(Promise.resolve(parserResult));
+                validatorSpy = sinon.stub().returns(validatorResults);
+                authenticatorSpy = sinon.stub().returns(Promise.resolve(authenticatorResults));
+                mutatorSpy = sinon.stub().returns(mutatorResults);
+                actionSpy = sinon.stub().returns(Promise.resolve(actionResult));
+                viewSpy = sinon.stub().returns(viewResult);
+
+                parserSpy.toString = toStringFn;
+                validatorSpy.toString = toStringFn;
+                authenticatorSpy.toString = toStringFn;
+                mutatorSpy.toString = toStringFn;
+                actionSpy.toString = toStringFn;
+                viewSpy.toString = toStringFn;
+
+                config = {
+                    get: {
+                        scope   : 'test:scope',
+                        options : {},
+                        defaults: optDefaults,
+                        inputs  : parserSpy,
+                        schema  : validatorSpy,
+                        auth    : authenticatorSpy,
+                        mutator : mutatorSpy,
+                        action  : actionSpy,
+                        view    : viewSpy
+                    }
+                };
+
+                controller.set(functionName, '/:id', config);
+
+                try {
+                    result = await controller.handler(context, request );
+                } catch (err) {
+                    error = err;
+                }
+            });
+
+            it('should not return an error', () => {
+                expect(error).to.be.undefined;
+            });
+
+            it('should return correct status', () => {
+                expect(result.status).to.equal(200);
+            });
+
+            it('should return correct body', () => {
+                expect(result.body).to.deep.equal(viewResult);
+            });
+
+            describe('parser;', () => {
+                it('should be executed once', async () => {
+                    expect((parserSpy as any).called).to.be.true;
+                    expect((parserSpy as any).callCount).to.equal(1);
+                });
+                it('should be executed with correct arguments', () => {
+                    expect(parserSpy.firstCall.calledWithExactly(request, optDefaults, {id})).to.be.true;
+                });
+            });
+
+            describe('validator;', () => {
+                it('should be executed once', async () => {
+                    expect((validatorSpy as any).called).to.be.true;
+                    expect((validatorSpy as any).callCount).to.equal(1);
+                });
+                it('should be executed with correct arguments', () => {
+                    expect(validatorSpy.firstCall.calledWithExactly(parserResult)).to.be.true;
+                });
+            });
+
+            describe('authenticator;', () => {
+                it('should be executed once', async () => {
+                    expect((authenticatorSpy as any).called).to.be.true;
+                    expect((authenticatorSpy as any).callCount).to.equal(1);
+                });
+                it('should be executed with correct arguments', () => {
+                    expect(authenticatorSpy.firstCall.calledWithExactly(config.get.scope, {type: 'key', data: 'value'})).to.be.true;
+                });
+            });
+
+            describe('mutator;', () => {
+                it('should be executed once', async () => {
+                    expect((mutatorSpy as any).called).to.be.true;
+                    expect((mutatorSpy as any).callCount).to.equal(1);
+                });
+                it('should be executed with correct arguments', () => {
+                    expect(mutatorSpy.firstCall.calledWithExactly(validatorResults, authenticatorResults)).to.be.true;
+                });
+            });
+
+            describe('action;', () => {
+                it('should be executed once', async () => {
+                    expect((actionSpy as any).called).to.be.true;
+                    expect((actionSpy as any).callCount).to.equal(1);
+                });
+                it('should be executed with correct arguments', () => {
+                    expect(actionSpy.firstCall.calledWithExactly(mutatorResults.action)).to.be.true;
+                });
+            });
+
+            describe('view;', () => {
+                it('should be executed once', async () => {
+                    expect((viewSpy as any).called).to.be.true;
+                    expect((viewSpy as any).callCount).to.equal(1);
+                });
+                it('should be executed with correct arguments', () => {
+                    expect(viewSpy.firstCall.calledWithExactly(actionResult, mutatorResults.view)).to.be.true;
+                });
+            });
+        });
+
+        describe('passing of data through all handlers (action -> view);', () => {
+            let actionSpy: any;
+            let viewSpy: any;
+
+            const id = 'params';
+
+            const optDefaults = {
+                query : false,
+                params: false,
+                body  : false
+            };
+            const requestQuery = {query: 'query'};
+            const requestBody = {body: 'body'};
+
+            const actionResult = {action: true};
+            const viewResult = {view: true};
+
+            const actionInputs = {...optDefaults, ...requestQuery, id, ...requestBody};
+
+            beforeEach(async () => {
+                controller = new HttpController();
+                context = new AzureFuncContext('id', functionName);
+                request = new AzureHttpReq('GET', `http://test.com/${id}`, null, requestQuery, requestBody);
+
+                actionSpy = sinon.stub().returns(Promise.resolve(actionResult));
+                viewSpy = sinon.stub().returns(viewResult);
+
+                actionSpy.toString = toStringFn;
+                viewSpy.toString = toStringFn;
+
+                config = {
+                    get: {
+                        defaults: optDefaults,
+                        action  : actionSpy,
+                        view    : viewSpy
+                    }
+                };
+
+                controller.set(functionName, '/:id', config);
+
+                try {
+                    result = await controller.handler(context, request );
+                } catch (err) {
+                    error = err;
+                }
+            });
+
+            it('should not return an error', () => {
+                expect(error).to.be.undefined;
+            });
+
+            it('should return correct status', () => {
+                expect(result.status).to.equal(200);
+            });
+
+            it('should return correct body', () => {
+                expect(result.body).to.deep.equal(viewResult);
+            });
+
+            describe('action;', () => {
+                it('should be executed once', async () => {
+                    expect((actionSpy as any).called).to.be.true;
+                    expect((actionSpy as any).callCount).to.equal(1);
+                });
+                it('should be executed with correct arguments', () => {
+                    expect(actionSpy.firstCall.calledWithExactly(actionInputs)).to.be.true;
+                });
+            });
+
+            describe('view;', () => {
+                it('should be executed once', async () => {
+                    expect((viewSpy as any).called).to.be.true;
+                    expect((viewSpy as any).callCount).to.equal(1);
+                });
+                it('should be executed with correct arguments', () => {
+                    expect(viewSpy.firstCall.calledWithExactly(actionResult, undefined)).to.be.true;
+                });
+            });
+        });
+
+        describe('passing of data through all handlers (action);', () => {
+            let actionSpy: any;
+
+            const id = 'params';
+
+            const optDefaults = {
+                query : false,
+                params: false,
+                body  : false
+            };
+            const requestQuery = {query: 'query'};
+            const requestBody = {body: 'body'};
+
+            const actionResult = {action: true};
+
+            const actionInputs = {...optDefaults, ...requestQuery, id, ...requestBody};
+
+            beforeEach(async () => {
+                controller = new HttpController();
+                context = new AzureFuncContext('id', functionName);
+                request = new AzureHttpReq('GET', `http://test.com/${id}`, null, requestQuery, requestBody);
+
+                actionSpy = sinon.stub();
+
+                actionSpy.toString = toStringFn;
+
+                config = {
+                    get: {
+                        defaults: optDefaults,
+                        action  : actionSpy,
+                        view    : null
+                    }
+                };
+
+                controller.set(functionName, '/:id', config);
+
+                try {
+                    result = await controller.handler(context, request );
+                } catch (err) {
+                    error = err;
+                }
+            });
+
+            it('should not return an error', () => {
+                expect(error).to.be.undefined;
+            });
+
+            it('should return correct status', () => {
+                expect(result.status).to.equal(204);
+            });
+
+            it('should return correct body', () => {
+                expect(result.body).to.equal(null);
+            });
+
+            describe('action;', () => {
+                it('should be executed once', async () => {
+                    expect((actionSpy as any).called).to.be.true;
+                    expect((actionSpy as any).callCount).to.equal(1);
+                });
+                it('should be executed with correct arguments', () => {
+                    expect(actionSpy.firstCall.calledWithExactly(actionInputs)).to.be.true;
+                });
+            });
+        });
+
+        describe('parsing route parameters;', () => {
+            let actionSpy: any;
+
+            const actionInputs = {id: '12345', ID: 'abcde'};
+
+            beforeEach(async () => {
+                controller = new HttpController();
+                context = new AzureFuncContext('id', functionName);
+                request = new AzureHttpReq('GET', `http://test.com/${actionInputs.id}/participants/${actionInputs.ID}`);
+
+                actionSpy = sinon.stub();
+
+                actionSpy.toString = toStringFn;
+
+                config = {
+                    get: {
+                        action: actionSpy,
+                        view  : null
+                    }
+                };
+
+                controller.set(functionName, '/:id/participants/:ID', config);
+
+                try {
+                    result = await controller.handler(context, request );
+                } catch (err) {
+                    err = error;
+                }
+            });
+
+            it('should not return an error', () => {
+                expect(error).to.be.undefined;
+            });
+
+            it('should return correct status', () => {
+                expect(result.status).to.equal(204);
+            });
+
+            it('should return correct body', () => {
+                expect(result.body).to.equal(null);
+            });
+
+            it('action should be executed with route params', () => {
+                expect(actionSpy.firstCall.calledWithExactly(actionInputs)).to.be.true;
+            });
+        });
+
+        describe('view with symbols;', () => {
+            let actionSpy: any;
+            let viewSpy: any;
+            let result: any;
+            let error: any;
+
+            const status = 255;
+            const headers = {foo: 'bar', bar: 'baz'};
+            const viewResult = {bar: 'baz'};
+
+            beforeEach(async () => {
+                controller = new HttpController();
+                context = new AzureFuncContext('id', functionName);
+                request = new AzureHttpReq('GET', 'http://test.com');
+
+                actionSpy = sinon.stub();
+                viewSpy = sinon.stub().returns({
+                    [symbols.responseStatus]: status,
+                    [symbols.responseHeaders]: headers,
+                    ...viewResult
+                });
+
+                actionSpy.toString = toStringFn;
+                viewSpy.toString = toStringFn;
+
+                config = {
+                    get: {
+                        action: actionSpy,
+                        view  : viewSpy
+                    }
+                };
+
+                controller.set(functionName, '/', config);
+
+                try {
+                    result = await controller.handler(context, request );
+                } catch (err) {
+                    error = err;
+                }
+            });
+
+            it('should not return an error', () => {
+                expect(error).to.be.undefined;
+            });
+
+            it('should return correct status', () => {
+                expect(result.status).to.equal(status);
+            });
+
+            it('should return correct headers', () => {
+                Object.keys(headers).forEach(key => {
+                    expect(result.headers).to.have.property(key, headers[key]);
+                });
+            });
+
+            it('should return correct body', () => {
+                expect(result.body).to.deep.equal(viewResult);
+            });
+        });
+    });
+
+    describe('Error handling of \'HttpController.handler()\' method', () => {
+        let controller: HttpController;
+        let config: HttpRouteConfig;
+        let context: AzureFunctionContext;
+        let request: AzureHttpRequest;
+        let result: any;
+        let error: any;
+
+        afterEach(() => {
+            result = error = undefined;
+        });
+
+        describe('exception in action;', () => {
+            let actionSpy: any;
+
+            beforeEach(async () => {
+                controller = new HttpController();
+                context = new AzureFuncContext('id', functionName);
+                request = new AzureHttpReq('GET', 'http://test.com');
+
+                actionSpy = sinon.stub().throws('Error', 'message');
+
+                actionSpy.toString = toStringFn;
+
+                config = {
+                    get: {
+                        action: actionSpy,
+                        view  : null
+                    }
+                };
+
+                controller.set(functionName, '/', config);
+
+                try {
+                    result = await controller.handler(context, request );
+                } catch (err) {
+                    error = err;
+                }
+            });
+
+            it('should not return an error', () => {
+                expect(error).to.be.undefined;
+            });
+
+            it('should return correct status', () => {
+                expect(result.status).to.equal(500);
+            });
+
+            it('should return correct body', () => {
+                expect(result.body).to.deep.equal({name: 'Error', message: 'message'});
+            });
+        });
+
+        describe('for rejected action;', () => {
+            let actionSpy: any;
+
+            beforeEach(async () => {
+                controller = new HttpController();
+                context = new AzureFuncContext('id', functionName);
+                request = new AzureHttpReq('GET', 'http://test.com');
+
+                actionSpy = sinon.stub().returns(Promise.reject(new Error('message')));
+
+                actionSpy.toString = toStringFn;
+
+                config = {
+                    get: {
+                        action: actionSpy,
+                        view  : null
+                    }
+                };
+
+                controller.set(functionName, '/', config);
+
+                try {
+                    result = await controller.handler(context, request );
+                } catch (err) {
+                    error = err;
+                }
+            });
+
+            it('should not return an error', () => {
+                expect(error).to.be.undefined;
+            });
+
+            it('should return correct status', () => {
+                expect(result.status).to.equal(500);
+            });
+
+            it('should return correct body', () => {
+                expect(result.body).to.deep.equal({name: 'Error', message: 'message'});
+            });
+        });
+
+        describe('with rethrowThreshold = 499 and error status 500;', () => {
+            let actionSpy: any;
+
+            beforeEach(async () => {
+                controller = new HttpController({rethrowThreshold: 499});
+                context = new AzureFuncContext('id', functionName);
+                request = new AzureHttpReq('GET', 'http://test.com');
+
+                actionSpy = sinon.stub().throws('Error', 'message');
+
+                actionSpy.toString = toStringFn;
+
+                config = {
+                    get: {
+                        action: actionSpy,
+                        view  : null
+                    }
+                };
+
+                controller.set(functionName, '/', config);
+
+                try {
+                    result = await controller.handler(context, request );
+                } catch (err) {
+                    error = err;
+                }
+            });
+
+            it('should throw exception', () => {
+                expect(result).to.be.undefined;
+                expect(error).to.not.be.undefined;
+            });
+        });
+
+        describe('with rethrowThreshold = 499 and error status 404;', () => {
+            let actionSpy: any;
+
+            beforeEach(async () => {
+                controller = new HttpController({rethrowThreshold: 499});
+                context = new AzureFuncContext('id', functionName);
+                request = new AzureHttpReq('GET', 'http://test.com');
+
+                actionSpy = sinon.stub().throws({status: 404, name: 'Error', message: 'message'});
+
+                actionSpy.toString = toStringFn;
+
+                config = {
+                    get: {
+                        action: actionSpy,
+                        view  : null
+                    }
+                };
+
+                controller.set(functionName, '/', config);
+
+                try {
+                    result = await controller.handler(context, request );
+                } catch (err) {
+                    error = err;
+                }
+            });
+
+            it('should not return an error', () => {
+                expect(error).to.be.undefined;
+            });
+
+            it('should return correct status', () => {
+                expect(result.status).to.equal(404);
+            });
+
+            it('should return correct body', () => {
+                expect(result.body).to.deep.equal({name: 'Error', message: 'message'});
+            });
+        });
     });
 });

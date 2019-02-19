@@ -73,7 +73,7 @@ export class HttpController {
         // build CORS headers
         const corsHeaders = buildCorsHeaders(config, this.defaults.cors);
 
-        // build 
+        // build
         for (let item in config) {
             switch (item) {
                 case 'get': case 'post': case 'put': case 'patch': case 'delete': {
@@ -195,7 +195,6 @@ export class HttpController {
                 };
             }
             else {
-
                 const viewContext: ViewContext = { auth, timestamp: operation.timestamp };
                 const view = opConfig.view.call(viewContext, result, viewOptions);
 
@@ -272,8 +271,8 @@ function processOptions(options?: Partial<HttpControllerConfig>): HttpController
 
     // set default endpoint options
     if (options.defaults) {
-        newOptions.defaults = { 
-            ...defaults.httpController.defaults, 
+        newOptions.defaults = {
+            ...defaults.httpController.defaults,
             ...options.defaults,
             cors: { ...defaults.httpController.defaults.cors, ...options.defaults.cors }
         };

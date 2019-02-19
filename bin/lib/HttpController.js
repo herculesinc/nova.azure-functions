@@ -33,7 +33,7 @@ class HttpController {
         }
         // build CORS headers
         const corsHeaders = buildCorsHeaders(config, this.defaults.cors);
-        // build 
+        // build
         for (let item in config) {
             switch (item) {
                 case 'get':

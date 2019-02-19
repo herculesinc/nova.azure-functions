@@ -1,7 +1,7 @@
 /// <reference path="./typings/azure-functions.d.ts" />
 
 declare module "@nova/azure-functions" {
-    
+
     // IMPORTS AND RE-EXPORTS
     // --------------------------------------------------------------------------------------------
     import { Executable, Context, Action } from '@nova/core';

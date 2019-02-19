@@ -5,7 +5,7 @@ import { AzureHttpResponse, AzureFunctionContext } from 'azure-functions';
 import { HttpRequestHead, Action } from '@nova/azure-functions';
 import { MockLogger } from './logger';
 
-// CLASS DEFINITION
+// DEFINITION
 // =================================================================================================
 export function mockAdapter(context: AzureFunctionContext, request: HttpRequestHead, actions: Action[]): Operation {
     const config: OperationConfig = {
