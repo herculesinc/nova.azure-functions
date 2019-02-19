@@ -5,28 +5,35 @@ declare module "find-my-way" {
         type RouteHandler = Function;
 
         export interface RouterConfig {
-            ignoreTrailingSlash?    : boolean;
-            maxParamLength?         : boolean;
-            allowUnsafeRegex?       : boolean;
+            ignoreTrailingSlash?    : boolean;  // default false
+            caseSensitive?          : boolean;  // default true
+            allowUnsafeRegex?       : boolean;  // default false
+            maxParamLength?         : boolean;  // default 100
+        }
+
+        export interface RouteOptions {
+            version                 : string;
         }
 
         export interface RouteDescriptor {
             handler : RouteHandler;
-            params? : object;
-            store?  : object;
+            params? : { [key: string]: string | undefined; };
+            store?  : any;
         }
 
         export interface Router {
-            on(method: HttpMethod, path: string, handler: RouteHandler, store?: object);
-            on(methods: HttpMethod[], path: string, handler: RouteHandler, store?: object);
+            on(method: HttpMethod, path: string, handler: RouteHandler, store?: object): void;
+            on(methods: HttpMethod[], path: string, handler: RouteHandler, store?: object): void;
+            on(method: HttpMethod, path: string, options: RouteOptions, handler: RouteHandler, store?: object): void;
+            on(methods: HttpMethod[], path: string, options: RouteOptions, handler: RouteHandler, store?: object): void;
 
-            off(method: HttpMethod, path: string): RouteDescriptor;
-            off(methods: HttpMethod[], path: string): RouteDescriptor[];
+            off(method: HttpMethod, path: string): void;
+            off(methods: HttpMethod[], path: string): void;
 
-            find(method: HttpMethod, path: string): RouteDescriptor;
+            find(method: HttpMethod, path: string, version?: string): RouteDescriptor;
 
-            reset();
-            prettyPrint();
+            reset(): void;
+            prettyPrint(): void;
         }
     }
 

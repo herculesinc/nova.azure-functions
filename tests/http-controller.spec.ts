@@ -151,7 +151,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
             describe('for unsupported method', () => {
                 ['option', 'test'].forEach(method => {
                     it(method.toUpperCase(), () => {
-                        expect(() => controller.set('test', '/', {[method]: {action}} as HttpRouteConfig)).to.throw(TypeError, 'error message');
+                        const METHOD = method.toUpperCase();
+                        expect(() => controller.set('test', '/', {[method]: {action}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${METHOD} /' endpoint: '${METHOD}' method is not supported`);
                     });
                 });
             });
@@ -159,7 +160,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
             describe('when action/actions is not provided for method', () => {
                 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
                     it(method.toUpperCase(), () => {
-                        expect(() => controller.set('test', '/', {[method]: {}} as HttpRouteConfig)).to.throw(TypeError, 'error message');
+                        const METHOD = method.toUpperCase();
+                        expect(() => controller.set('test', '/', {[method]: {}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${METHOD} /' endpoint: no actions were provided`);
                     });
                 });
             });
@@ -172,7 +174,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                         };
 
                         expect(() => controller.set('test', '/', config)).to.not.throw();
-                        expect(() => controller.set('test', '/', config)).to.throw(TypeError, `Method '${method.toUpperCase()}' already declared for route '/'`);
+                        expect(() => controller.set('test', '/', config)).to.throw(TypeError, `Invalid definition for '/' endpoint: conflicting endpoint handler found`);
                     });
                 });
             });

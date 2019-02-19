@@ -62,35 +62,38 @@ export class HttpController {
             this.routers.set(functionName, router);
         }
 
-        route = cleanPath(route); // TODO: test for route conflicts?
+        // make sure the route is valid
+        route = cleanPath(route);
+        for (let method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
+            if (router.find(method as Router.HttpMethod, route)) {
+                throw new TypeError(`Invalid definition for '${route}' endpoint: conflicting endpoint handler found`);
+            }
+        }
+
+        // build CORS headers
         const corsHeaders = buildCorsHeaders(config, this.defaults.cors);
 
+        // build 
+        for (let item in config) {
+            switch (item) {
+                case 'get': case 'post': case 'put': case 'patch': case 'delete': {
+                    const method = item.toUpperCase() as Router.HttpMethod;
+                    const opConfig = buildOpConfig(method, route, config[item], this.defaults, corsHeaders);
+                    router.on(method, route, noop, opConfig);
+                    break;
+                }
+                case 'cors': {
+                    // skip since CORS headers have already been built
+                    break;
+                }
+                default: {
+                    const method = item.toUpperCase();
+                    throw new TypeError(`Invalid definition for '${method} ${route}' endpoint: '${method}' method is not supported`);
+                }
+            }
+        }
+
         router.on('OPTIONS', route, noop, corsHeaders);
-
-        if (config.get) {
-            const operationConfig = buildOpConfig('GET', route, config.get, this.defaults, corsHeaders);
-            router.on('GET', route, noop, operationConfig);
-        }
-
-        if (config.post) {
-            const operationConfig = buildOpConfig('POST', route, config.post, this.defaults, corsHeaders);
-            router.on('POST', route, noop, operationConfig);
-        }
-
-        if (config.put) {
-            const operationConfig = buildOpConfig('PUT', route, config.put, this.defaults, corsHeaders);
-            router.on('PUT', route, noop, operationConfig);
-        }
-
-        if (config.patch) {
-            const operationConfig = buildOpConfig('PATCH', route, config.patch, this.defaults, corsHeaders);
-            router.on('PATCH', route, noop, operationConfig);
-        }
-
-        if (config.delete) {
-            const operationConfig = buildOpConfig('DELETE', route, config.delete, this.defaults, corsHeaders);
-            router.on('DELETE', route, noop, operationConfig);
-        }
     }
 
     async handler(context: AzureFunctionContext, request: AzureHttpRequest): Promise<AzureHttpResponse> {
@@ -284,8 +287,8 @@ function processOptions(options?: Partial<HttpControllerConfig>): HttpController
 
 function cleanPath(path: string) {
     if (!path) throw new TypeError(`Route path '${path}' is not valid`);
-    if (typeof path !== 'string') throw new TypeError(`Route path must be a string`);
-    if (path.charAt(0) !== '/') throw new TypeError(`Route path must start with '/'`);
+    if (typeof path !== 'string') throw new TypeError(`Route path ${path} is not valid: a path must be a string`);
+    if (path.charAt(0) !== '/') throw new TypeError(`Route path ${path} is not valid: a path must start with '/'`);
     if (path !== '/') {
         while (path.charAt(path.length - 1) === '/') {
             path = path.slice(0, -1);   // removes last character
@@ -378,6 +381,9 @@ function buildOpConfig(method: string, path: string, config: HttpEndpointConfig,
                 actions.push(action);
             }
         }
+    }
+    else {
+        throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: no actions were provided`);
     }
 
     return {
