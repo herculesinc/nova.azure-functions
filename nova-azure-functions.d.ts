@@ -32,7 +32,7 @@ declare module "@nova/azure-functions" {
 
     export interface HttpRouterConfig {
         ignoreTrailingSlash?    : boolean;
-        maxParamLength?         : boolean; // todo ??
+        maxParamLength?         : number;
         allowUnsafeRegex?       : boolean;
     }
 

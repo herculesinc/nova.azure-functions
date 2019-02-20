@@ -1,6 +1,6 @@
 declare module "find-my-way" {
-    
-    module FindMyWay { 
+
+    module FindMyWay {
         type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
         type RouteHandler = Function;
 
@@ -8,7 +8,7 @@ declare module "find-my-way" {
             ignoreTrailingSlash?    : boolean;  // default false
             caseSensitive?          : boolean;  // default true
             allowUnsafeRegex?       : boolean;  // default false
-            maxParamLength?         : boolean;  // default 100
+            maxParamLength?         : number;   // default 100
         }
 
         export interface RouteOptions {

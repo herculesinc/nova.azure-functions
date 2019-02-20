@@ -1,4 +1,4 @@
-import * as chai from 'chai';
+import { expect } from 'chai';
 import * as sinon from 'sinon';
 
 import {
@@ -16,9 +16,8 @@ import {
 } from 'azure-functions';
 import { defaults } from '../lib/defaults';
 import { HttpController, symbols } from '../index';
+import { HttpSegment } from '../lib/HttpSegment';
 import { AzureFuncContext, AzureHttpReq, mockAdapter } from './mocks';
-
-const expect = chai.expect;
 
 const toStringFn = () => 'function';
 const functionName = 'test';
@@ -66,7 +65,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
         it('should provide custom routerOptions to new controller', () => {
             const routerOptions: HttpRouterConfig = {
                 ignoreTrailingSlash: true,
-                maxParamLength     : true,
+                maxParamLength     : 200,
                 allowUnsafeRegex   : true
             };
             const options: Partial<HttpControllerConfig> = {
@@ -203,7 +202,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                 });
             });
 
-            describe('when action and actions provided at the same time for method', () => {
+            describe('when action provided as arrow function', () => {
                 SUPPORTED_METHODS.forEach(method => {
                     it(method, () => {
                         const config: HttpRouteConfig = {
@@ -238,13 +237,14 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
                 controller.set('/', config);
 
-                const {status, body} = await controller.handler(context, request );
-
-                expect(status).to.equal(200);
-                expect(body).to.deep.equal(actionResult);
+                result = await controller.handler(context, request );
             } catch (err) {
-                expect(err.message).to.equal('should not have an error');
+                error = err
             }
+
+            expect(error).to.be.undefined;
+            expect(result.status).to.equal(200);
+            expect(result.body).to.deep.equal(actionResult);
         });
 
         describe('passing of data through all handlers (parser -> validator -> authenticator -> mutator -> action -> view);', () => {
@@ -685,7 +685,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
         });
     });
 
-    describe('Error handling of \'HttpController.handler()\' method', () => {
+    describe('Error handling for \'HttpController.handler()\' method', () => {
         let controller: HttpController;
         let config: HttpRouteConfig;
         let context: AzureFunctionContext;
@@ -841,6 +841,118 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             it('should return correct body', () => {
                 expect(result.body).to.deep.equal({name: 'Error', message: 'message'});
+            });
+        });
+    });
+
+    describe('Executing \'HttpController.segment()\' method', () => {
+        let controller: HttpController;
+
+        const testSegment = '/test';
+
+        beforeEach(() => {
+            controller = new HttpController();
+        });
+
+        it(`should execute segment() method without an error`, () => {
+            expect(() => controller.segment(testSegment)).to.not.throw();
+        });
+
+        it(`should add '${testSegment}' segment to controller`, () => {
+            controller.segment( testSegment );
+
+            expect((controller as any).segments.size).to.equal(1);
+        });
+
+        it('should return new segment', () => {
+            const segment = controller.segment(testSegment);
+
+            expect(segment).to.not.be.undefined;
+            expect(segment).to.be.an.instanceof(HttpSegment);
+        });
+
+        it('should return an error if segment already registered', () => {
+            const segment = controller.segment(testSegment);
+
+            expect(() => controller.segment(testSegment)).to.throw(TypeError, `Cannot register segment: segment for '${testSegment}' has already been registered`);
+        });
+
+    });
+
+    describe('Executing \'HttpController.handler()\' method for subroute', () => {
+        let controller: HttpController;
+        let segment: HttpSegment;
+        let config: HttpRouteConfig;
+        let context: AzureFunctionContext;
+        let request: AzureHttpRequest;
+        let action: any;
+
+        const testRouteId = 'abcde';
+        const testId = '12345';
+
+        const routeSegment = '/:routeId';
+        const subroute = '/test/:id';
+        const testUrl = `http://test.com/${testRouteId}/test/${testId}`;
+        const actionResult = {test: false};
+
+        beforeEach(() => {
+            controller = new HttpController();
+            segment = controller.segment(routeSegment);
+            context = new AzureFuncContext('id', functionName);
+        });
+
+        it('should execute handler() method without errors', async () => {
+            try {
+                action = function(): Promise<any> {return Promise.resolve(actionResult)};
+                segment.set(subroute, { get: { action } });
+                request = new AzureHttpReq('GET', testUrl);
+                result = await controller.handler(context, request );
+            } catch (err) {
+                error = err;
+            }
+
+            expect(error).to.be.undefined;
+            expect(result.status).to.equal(200);
+            expect(result.body).to.deep.equal(actionResult);
+        });
+
+        describe('parsing route parameters;', () => {
+            let actionSpy: any;
+
+            beforeEach(async () => {
+                request = new AzureHttpReq('GET', testUrl);
+
+                actionSpy = sinon.stub();
+
+                actionSpy.toString = toStringFn;
+
+                config = {
+                    get: {action: actionSpy}
+                };
+
+                segment.set(subroute, config);
+
+                try {
+                    result = await controller.handler(context, request );
+                } catch (err) {
+                    err = error;
+                }
+            });
+
+            it('should not return an error', () => {
+                expect(error).to.be.undefined;
+            });
+
+            it('should return correct status', () => {
+                expect(result.status).to.equal(404);
+            });
+
+            it('should return correct body', () => {
+                expect(result.body).to.equal(null);
+            });
+
+            it('action should be executed with route params', () => {
+                expect(actionSpy.firstCall.calledWithExactly({routeId: testRouteId, id: testId})).to.be.true;
             });
         });
     });
