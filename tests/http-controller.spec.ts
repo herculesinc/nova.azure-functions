@@ -29,11 +29,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             expect(controller).to.not.be.undefined;
 
-            expect((controller as any).routers).to.not.be.undefined;
-            expect((controller as any).routers.size).to.equal(0);
-
-            expect((controller as any).routerOptions).to.be.undefined;
-
+            expect((controller as any).router).to.not.be.undefined;
             expect((controller as any).rethrowThreshold).to.equal(defaults.httpController.rethrowThreshold);
 
             expect((controller as any).adapter).to.equal(defaults.httpController.adapter);
@@ -41,6 +37,9 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
             expect((controller as any).defaults).to.not.equal(defaults.httpController.defaults);
             expect((controller as any).defaults).to.deep.equal(defaults.httpController.defaults);
             expect((controller as any).defaults.cors).to.not.equal(defaults.httpController.defaults.cors);
+
+            expect((controller as any).segments).to.not.be.undefined;
+            expect((controller as any).segments.size).to.equal(0);
         });
 
         it('should provide custom adapter to new controller', () => {
@@ -57,7 +56,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
         it('should provide custom routerOptions to new controller', () => {
             const routerOptions: HttpRouterConfig = {
                 ignoreTrailingSlash: true,
-                maxParamLength     : false,
+                maxParamLength     : true,
                 allowUnsafeRegex   : true
             };
             const options: Partial<HttpControllerConfig> = {
@@ -66,8 +65,9 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             const controller = new HttpController(options);
 
-            expect((controller as any).routerOptions).to.not.be.undefined;
-            expect((controller as any).routerOptions).to.equal(routerOptions);
+            Object.keys(routerOptions).forEach(key => {
+                expect((controller as any).router[key]).to.equal(routerOptions[key]);
+            });
         });
 
         it('should provide custom rethrowThreshold to new controller', () => {

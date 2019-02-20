@@ -37,7 +37,7 @@ interface OperationConfig {
 // =================================================================================================
 export class HttpController {
 
-    private readonly router             : Router.Router;;
+    private readonly router             : Router.Router;
     private readonly adapter            : HttpOperationAdapter;
     private readonly defaults           : HttpEndpointDefaults;
     private readonly segments           : Map<string, HttpSegment>;
