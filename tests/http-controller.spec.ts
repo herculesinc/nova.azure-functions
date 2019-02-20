@@ -329,8 +329,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             describe('parser;', () => {
                 it('should be executed once', async () => {
-                    expect((parserSpy as any).called).to.be.true;
-                    expect((parserSpy as any).callCount).to.equal(1);
+                    expect(parserSpy.called).to.be.true;
+                    expect(parserSpy.callCount).to.equal(1);
                 });
                 it('should be executed with correct arguments', () => {
                     expect(parserSpy.firstCall.calledWithExactly(request, optDefaults, {id})).to.be.true;
@@ -339,8 +339,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             describe('validator;', () => {
                 it('should be executed once', async () => {
-                    expect((validatorSpy as any).called).to.be.true;
-                    expect((validatorSpy as any).callCount).to.equal(1);
+                    expect(validatorSpy.called).to.be.true;
+                    expect(validatorSpy.callCount).to.equal(1);
                 });
                 it('should be executed with correct arguments', () => {
                     expect(validatorSpy.firstCall.calledWithExactly(parserResult)).to.be.true;
@@ -349,8 +349,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             describe('authenticator;', () => {
                 it('should be executed once', async () => {
-                    expect((authenticatorSpy as any).called).to.be.true;
-                    expect((authenticatorSpy as any).callCount).to.equal(1);
+                    expect(authenticatorSpy.called).to.be.true;
+                    expect(authenticatorSpy.callCount).to.equal(1);
                 });
                 it('should be executed with correct arguments', () => {
                     expect(authenticatorSpy.firstCall.calledWithExactly(config.get.scope, {type: 'key', data: 'value'})).to.be.true;
@@ -359,8 +359,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             describe('mutator;', () => {
                 it('should be executed once', async () => {
-                    expect((mutatorSpy as any).called).to.be.true;
-                    expect((mutatorSpy as any).callCount).to.equal(1);
+                    expect(mutatorSpy.called).to.be.true;
+                    expect(mutatorSpy.callCount).to.equal(1);
                 });
                 it('should be executed with correct arguments', () => {
                     expect(mutatorSpy.firstCall.calledWithExactly(validatorResults, authenticatorResults)).to.be.true;
@@ -369,8 +369,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             describe('action;', () => {
                 it('should be executed once', async () => {
-                    expect((actionSpy as any).called).to.be.true;
-                    expect((actionSpy as any).callCount).to.equal(1);
+                    expect(actionSpy.called).to.be.true;
+                    expect(actionSpy.callCount).to.equal(1);
                 });
                 it('should be executed with correct arguments', () => {
                     expect(actionSpy.firstCall.calledWithExactly(mutatorResults.action)).to.be.true;
@@ -379,8 +379,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             describe('view;', () => {
                 it('should be executed once', async () => {
-                    expect((viewSpy as any).called).to.be.true;
-                    expect((viewSpy as any).callCount).to.equal(1);
+                    expect(viewSpy.called).to.be.true;
+                    expect(viewSpy.callCount).to.equal(1);
                 });
                 it('should be executed with correct arguments', () => {
                     expect(viewSpy.firstCall.calledWithExactly(actionResult, mutatorResults.view)).to.be.true;
@@ -449,8 +449,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             describe('action;', () => {
                 it('should be executed once', async () => {
-                    expect((actionSpy as any).called).to.be.true;
-                    expect((actionSpy as any).callCount).to.equal(1);
+                    expect(actionSpy.called).to.be.true;
+                    expect(actionSpy.callCount).to.equal(1);
                 });
                 it('should be executed with correct arguments', () => {
                     expect(actionSpy.firstCall.calledWithExactly(actionInputs)).to.be.true;
@@ -459,8 +459,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             describe('view;', () => {
                 it('should be executed once', async () => {
-                    expect((viewSpy as any).called).to.be.true;
-                    expect((viewSpy as any).callCount).to.equal(1);
+                    expect(viewSpy.called).to.be.true;
+                    expect(viewSpy.callCount).to.equal(1);
                 });
                 it('should be executed with correct arguments', () => {
                     expect(viewSpy.firstCall.calledWithExactly(actionResult, undefined)).to.be.true;
@@ -524,8 +524,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
             describe('action;', () => {
                 it('should be executed once', async () => {
-                    expect((actionSpy as any).called).to.be.true;
-                    expect((actionSpy as any).callCount).to.equal(1);
+                    expect(actionSpy.called).to.be.true;
+                    expect(actionSpy.callCount).to.equal(1);
                 });
                 it('should be executed with correct arguments', () => {
                     expect(actionSpy.firstCall.calledWithExactly(actionInputs)).to.be.true;
