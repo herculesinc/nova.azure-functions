@@ -11,7 +11,8 @@ import {
 } from '@nova/azure-functions';
 import {
     AzureFunctionContext,
-    AzureHttpRequest
+    AzureHttpRequest,
+    HttpMethod
 } from 'azure-functions';
 import { defaults } from '../lib/defaults';
 import { HttpController, symbols } from '../index';
@@ -22,7 +23,16 @@ const expect = chai.expect;
 const toStringFn = () => 'function';
 const functionName = 'test';
 
+const SUPPORTED_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+
 describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
+    let result: any;
+    let error: any;
+
+    afterEach(() => {
+        result = error = undefined;
+    });
+
     describe('Creating an \'HttpController\';', () => {
         it('should create new HttpController with default options', () => {
             const controller = new HttpController();
@@ -132,10 +142,10 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                 action = function(): Promise<any> {return Promise.resolve()}
             });
 
-            ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
-                it(method.toUpperCase(), () => {
+            SUPPORTED_METHODS.forEach(method => {
+                it(method, () => {
                     const config: HttpRouteConfig = {
-                        [method]: { action }
+                        [method.toLowerCase()]: { action }
                     };
 
                     expect(() => controller.set(route, config)).to.not.throw();
@@ -150,30 +160,26 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
             });
 
             describe('for unsupported method', () => {
-                ['option', 'test'].forEach(method => {
-                    const uMethod = method.toUpperCase();
-
-                    it(uMethod, () => {
-                        expect(() => controller.set(route, {[method]: {action}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: '${uMethod}' method is not supported`);
+                ['OPTION', 'TEST'].forEach(method => {
+                    it(method, () => {
+                        expect(() => controller.set(route, {[method.toLowerCase()]: {action}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${method} ${route}' endpoint: '${method}' method is not supported`);
                     });
                 });
             });
 
             describe('when action/actions is not provided for method', () => {
-                ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
-                    const uMethod = method.toUpperCase();
-
-                    it(uMethod, () => {
-                        expect(() => controller.set(route, {[method]: {}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: no actions were provided`);
+                SUPPORTED_METHODS.forEach(method => {
+                    it(method, () => {
+                        expect(() => controller.set(route, {[method.toLowerCase()]: {}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${method} ${route}' endpoint: no actions were provided`);
                     });
                 });
             });
 
             describe('when route is already registered for method', () => {
-                ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
+                SUPPORTED_METHODS.forEach(method => {
                     it(method.toUpperCase(), () => {
                         const config: HttpRouteConfig = {
-                            [method]: { action }
+                            [method.toLowerCase()]: { action }
                         };
 
                         expect(() => controller.set(route, config)).to.not.throw();
@@ -183,34 +189,30 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
             });
 
             describe('when action and actions provided at the same time for method', () => {
-                ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
-                    const uMethod = method.toUpperCase();
-
-                    it(uMethod, () => {
+                SUPPORTED_METHODS.forEach(method => {
+                    it(method, () => {
                         const config: HttpRouteConfig = {
-                            [method]: {
+                            [method.toLowerCase()]: {
                                 action,
                                 actions: [ action ]
                             }
                         };
 
-                        expect(() => controller.set(route, config)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: 'action' and 'actions' cannot be provided at the same time`);
+                        expect(() => controller.set(route, config)).to.throw(TypeError, `Invalid definition for '${method} ${route}' endpoint: 'action' and 'actions' cannot be provided at the same time`);
                     });
                 });
             });
 
             describe('when action and actions provided at the same time for method', () => {
-                ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
-                    const uMethod = method.toUpperCase();
-
-                    it(uMethod, () => {
+                SUPPORTED_METHODS.forEach(method => {
+                    it(method, () => {
                         const config: HttpRouteConfig = {
-                            [method]: {
+                            [method.toLowerCase()]: {
                                 action: (): Promise<any> => Promise.resolve()
                             }
                         };
 
-                        expect(() => controller.set(route, config)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: action must be a regular function`);
+                        expect(() => controller.set(route, config)).to.throw(TypeError, `Invalid definition for '${method} ${route}' endpoint: action must be a regular function`);
                     });
                 });
             });
@@ -222,12 +224,6 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
         let config: HttpRouteConfig;
         let context: AzureFunctionContext;
         let request: AzureHttpRequest;
-        let result: any;
-        let error: any;
-
-        afterEach(() => {
-            result = error = undefined;
-        });
 
         it('should execute handler() method without errors', async () => {
             const actionResult = {test: false};
@@ -501,8 +497,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                 config = {
                     get: {
                         defaults: optDefaults,
-                        action  : actionSpy,
-                        view    : null
+                        action  : actionSpy
                     }
                 };
 
@@ -520,7 +515,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
             });
 
             it('should return correct status', () => {
-                expect(result.status).to.equal(204);
+                expect(result.status).to.equal(404);
             });
 
             it('should return correct body', () => {
@@ -534,6 +529,53 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                 });
                 it('should be executed with correct arguments', () => {
                     expect(actionSpy.firstCall.calledWithExactly(actionInputs)).to.be.true;
+                });
+            });
+        });
+
+        describe('when action and view return no results for method', () => {
+            let actionSpy: any;
+
+            beforeEach(async () => {
+                controller = new HttpController();
+                context = new AzureFuncContext('id', functionName);
+
+                actionSpy = sinon.stub();
+
+                actionSpy.toString = toStringFn;
+            });
+
+            SUPPORTED_METHODS.forEach(method => {
+                const status = method === 'GET' ? 404 : 204;
+
+                describe(method, () => {
+                    beforeEach(async () => {
+                        request = new AzureHttpReq(method, 'http://test.com');
+
+                        config = {
+                            [method.toLowerCase()]: {
+                                action: actionSpy
+                            }
+                        };
+
+                        controller.set('/', config);
+
+                        try {
+                            result = await controller.handler(context, request );
+                        } catch (err) {
+                            error = err;
+                        }
+                    });
+
+                    it('should not return an error', () => {
+                        expect(error).to.be.undefined;
+                    });
+                    it(`should return status '${status}'`, () => {
+                        expect(result.status).to.equal(status);
+                    });
+                    it('should return correct body', () => {
+                        expect(result.body).to.equal(null);
+                    });
                 });
             });
         });
@@ -554,8 +596,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
                 config = {
                     get: {
-                        action: actionSpy,
-                        view  : null
+                        action: actionSpy
                     }
                 };
 
@@ -573,7 +614,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
             });
 
             it('should return correct status', () => {
-                expect(result.status).to.equal(204);
+                expect(result.status).to.equal(404);
             });
 
             it('should return correct body', () => {
@@ -588,8 +629,6 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
         describe('view with symbols;', () => {
             let actionSpy: any;
             let viewSpy: any;
-            let result: any;
-            let error: any;
 
             const status = 255;
             const headers = {foo: 'bar', bar: 'baz'};
@@ -651,12 +690,6 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
         let config: HttpRouteConfig;
         let context: AzureFunctionContext;
         let request: AzureHttpRequest;
-        let result: any;
-        let error: any;
-
-        afterEach(() => {
-            result = error = undefined;
-        });
 
         describe('exception in action;', () => {
             let actionSpy: any;
@@ -672,8 +705,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
                 config = {
                     get: {
-                        action: actionSpy,
-                        view  : null
+                        action: actionSpy
                     }
                 };
 
@@ -713,8 +745,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
                 config = {
                     get: {
-                        action: actionSpy,
-                        view  : null
+                        action: actionSpy
                     }
                 };
 
@@ -754,8 +785,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
                 config = {
                     get: {
-                        action: actionSpy,
-                        view  : null
+                        action: actionSpy
                     }
                 };
 
@@ -788,8 +818,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
 
                 config = {
                     get: {
-                        action: actionSpy,
-                        view  : null
+                        action: actionSpy
                     }
                 };
 
