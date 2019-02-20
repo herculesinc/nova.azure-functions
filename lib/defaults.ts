@@ -1,10 +1,9 @@
 // IMPORTS
 // =================================================================================================
-import { Operation, HttpStatusCode } from '@nova/core';
+import { Operation, HttpStatusCode, Logger, TraceSource, TraceCommand } from '@nova/core';
 import { AzureHttpResponse, AzureFunctionContext } from 'azure-functions';
 import {
-    HttpControllerConfig, HttpRequestHead, MultipartDefaults, Action,
-    QueueControllerConfig, TimerControllerConfig, Logger, TraceSource, TraceCommand
+    HttpControllerConfig, HttpRequestHead, MultipartDefaults, Action, QueueControllerConfig, TimerControllerConfig
 } from '@nova/azure-functions';
 
 // INTERFACES
@@ -24,7 +23,9 @@ interface Defaults {
 export const defaults: Defaults = {
     httpController: {
         adapter             : defaultHttpOperationAdapter,
-        routerOptions       : undefined,    // using find-my-way defaults
+        routerOptions: {
+            ignoreTrailingSlash : true
+        },
         rethrowThreshold    : HttpStatusCode.InternalServerError,
         defaults: {
             cors: {

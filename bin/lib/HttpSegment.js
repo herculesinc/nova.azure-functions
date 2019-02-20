@@ -1,0 +1,55 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const util = require("./util");
+// CLASS DEFINITION
+// =================================================================================================
+class HttpSegment {
+    // CONSTRUCTOR
+    // ---------------------------------------------------------------------------------------------
+    constructor(controller, path, defaults) {
+        this.controller = controller;
+        this.root = util.cleanPath(path);
+        if (defaults) {
+            this.defaults = Object.assign({}, defaults, { cors: Object.assign({}, defaults.cors) });
+        }
+    }
+    // ROUTE REGISTRATION
+    // ---------------------------------------------------------------------------------------------
+    set(path, config) {
+        path = util.cleanPath(path);
+        if (this.defaults) {
+            config = applyDefaults(config, this.defaults, this.root + path);
+        }
+        this.controller.set(this.root + path, config);
+    }
+}
+exports.HttpSegment = HttpSegment;
+// HELPER FUNCTIONS
+// =================================================================================================
+function applyDefaults(config, defaults, path) {
+    const merged = {};
+    for (let item in config) {
+        switch (item) {
+            case 'get':
+            case 'post':
+            case 'put':
+            case 'patch':
+            case 'delete': {
+                merged[item] = Object.assign({}, Object.assign({}, defaults, { cors: undefined }), config[item]);
+                break;
+            }
+            case 'cors': {
+                if (!config.cors && defaults.cors) {
+                    merged.cors = defaults.cors;
+                }
+                break;
+            }
+            default: {
+                const method = item.toUpperCase();
+                throw new TypeError(`Invalid definition for '${method} ${path}' endpoint: '${method}' method is not supported`);
+            }
+        }
+    }
+    return merged;
+}
+//# sourceMappingURL=HttpSegment.js.map

@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Router = require("find-my-way");
 const typeIs = require("type-is");
 const defaults_1 = require("./defaults");
+const HttpSegment_1 = require("./HttpSegment");
 const util = require("./util");
 // MODULE VARIABLES
 // =================================================================================================
@@ -10,30 +11,30 @@ const JSON_CONTENT = ['application/json'];
 // CLASS DEFINITION
 // =================================================================================================
 class HttpController {
+    ;
+    // CONSTRUCTOR
+    // ---------------------------------------------------------------------------------------------
     constructor(options) {
         options = processOptions(options);
-        this.routers = new Map();
-        this.routerOptions = options.routerOptions;
+        this.router = Router(options.routerOptions);
         this.rethrowThreshold = options.rethrowThreshold;
         this.adapter = options.adapter;
         this.defaults = options.defaults;
+        this.segments = new Map();
     }
-    set(functionName, route, config) {
-        let router = this.routers.get(functionName);
-        if (!router) {
-            router = Router(this.routerOptions);
-            this.routers.set(functionName, router);
-        }
+    // ROUTE REGISTRATION
+    // ---------------------------------------------------------------------------------------------
+    set(route, config) {
         // make sure the route is valid
-        route = cleanPath(route);
+        route = util.cleanPath(route);
         for (let method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
-            if (router.find(method, route)) {
+            if (this.router.find(method, route)) {
                 throw new TypeError(`Invalid definition for '${route}' endpoint: conflicting endpoint handler found`);
             }
         }
         // build CORS headers
         const corsHeaders = buildCorsHeaders(config, this.defaults.cors);
-        // build
+        // build endpoint handlers
         for (let item in config) {
             switch (item) {
                 case 'get':
@@ -43,7 +44,7 @@ class HttpController {
                 case 'delete': {
                     const method = item.toUpperCase();
                     const opConfig = buildOpConfig(method, route, config[item], this.defaults, corsHeaders);
-                    router.on(method, route, noop, opConfig);
+                    this.router.on(method, route, noop, opConfig);
                     break;
                 }
                 case 'cors': {
@@ -56,17 +57,25 @@ class HttpController {
                 }
             }
         }
-        router.on('OPTIONS', route, noop, corsHeaders);
+        this.router.on('OPTIONS', route, noop, corsHeaders);
     }
-    async handler(context, request) {
-        // check if the route is registered
-        const functionName = context.executionContext.functionName;
-        const router = this.routers.get(functionName);
-        if (!router) {
-            throw new Error(`Router for '${functionName}' could not be found`);
+    segment(root, defaults) {
+        root = util.cleanPath(root);
+        let segment = this.segments.get(root);
+        if (segment) {
+            throw new TypeError(`Cannot register segment: segment for '${root}' has already been registered`);
         }
-        const route = router.find(request.method, '/' + (request.params.route || ''));
+        else {
+            segment = new HttpSegment_1.HttpSegment(this, root, defaults);
+            this.segments.set(root, segment);
+        }
+        return segment;
+    }
+    // ROUTE HANDLING
+    // ---------------------------------------------------------------------------------------------
+    async handler(context, request) {
         // 0 ----- make sure the request needs to be handled
+        const route = this.router.find(request.method, '/' + (request.params.route || ''));
         if (!route) {
             // route not found - return error
             return defaults_1.defaults.notFoundResponse;
@@ -151,17 +160,19 @@ class HttpController {
                 const viewContext = { auth, timestamp: operation.timestamp };
                 const view = opConfig.view.call(viewContext, result, viewOptions);
                 if (!view) {
+                    // for GET requests return NotFound; otherwise NoContent
                     response = {
-                        status: 404 /* NotFound */,
+                        status: request.method === 'GET' ? 404 /* NotFound */ : 204 /* NoContent */,
                         headers: opConfig.headers,
                         body: null
                     };
                 }
                 else {
+                    const status = view[defaults_1.symbols.responseStatus] || 200 /* OK */;
                     response = {
-                        status: view[defaults_1.symbols.responseStatus] || 200 /* OK */,
+                        status: status,
                         headers: Object.assign({}, opConfig.headers, view[defaults_1.symbols.responseHeaders]),
-                        body: view
+                        body: status === 204 /* NoContent */ ? null : view
                     };
                 }
             }
@@ -220,20 +231,6 @@ function processOptions(options) {
         newOptions.defaults = Object.assign({}, defaults_1.defaults.httpController.defaults);
     }
     return newOptions;
-}
-function cleanPath(path) {
-    if (!path)
-        throw new TypeError(`Route path '${path}' is not valid`);
-    if (typeof path !== 'string')
-        throw new TypeError(`Route path ${path} is not valid: a path must be a string`);
-    if (path.charAt(0) !== '/')
-        throw new TypeError(`Route path ${path} is not valid: a path must start with '/'`);
-    if (path !== '/') {
-        while (path.charAt(path.length - 1) === '/') {
-            path = path.slice(0, -1); // removes last character
-        }
-    }
-    return path;
 }
 function buildCorsHeaders(config, defaultCors) {
     // merge default and rout CORS

@@ -9,6 +9,7 @@ import {
 import * as Router from 'find-my-way';
 import * as typeIs from 'type-is';
 import { defaults, symbols } from './defaults';
+import { HttpSegment } from './HttpSegment';
 import * as util from './util';
 
 // MODULE VARIABLES
@@ -36,36 +37,33 @@ interface OperationConfig {
 // =================================================================================================
 export class HttpController {
 
-    private readonly routers    : Map<string,Router.Router>;
-    private readonly adapter    : HttpOperationAdapter;
-    private readonly defaults   : HttpEndpointDefaults;
-
-    private readonly routerOptions      : Router.RouterConfig;
+    private readonly router             : Router.Router;;
+    private readonly adapter            : HttpOperationAdapter;
+    private readonly defaults           : HttpEndpointDefaults;
+    private readonly segments           : Map<string, HttpSegment>;
     private readonly rethrowThreshold   : number;
 
+    // CONSTRUCTOR
+    // ---------------------------------------------------------------------------------------------
     constructor(options?: Partial<HttpControllerConfig>) {
         options = processOptions(options);
 
-        this.routers = new Map();
-        this.routerOptions = options.routerOptions;
+        this.router = Router(options.routerOptions);
         this.rethrowThreshold = options.rethrowThreshold;
 
         this.adapter = options.adapter;
         this.defaults = options.defaults;
+        this.segments = new Map();
     }
 
-    set(functionName: string, route: string, config: HttpRouteConfig) {
-
-        let router = this.routers.get(functionName);
-        if (!router) {
-            router = Router(this.routerOptions);
-            this.routers.set(functionName, router);
-        }
+    // ROUTE REGISTRATION
+    // ---------------------------------------------------------------------------------------------
+    set(route: string, config: HttpRouteConfig) {
 
         // make sure the route is valid
-        route = cleanPath(route);
+        route = util.cleanPath(route);
         for (let method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
-            if (router.find(method as Router.HttpMethod, route)) {
+            if (this.router.find(method as Router.HttpMethod, route)) {
                 throw new TypeError(`Invalid definition for '${route}' endpoint: conflicting endpoint handler found`);
             }
         }
@@ -73,13 +71,13 @@ export class HttpController {
         // build CORS headers
         const corsHeaders = buildCorsHeaders(config, this.defaults.cors);
 
-        // build
+        // build endpoint handlers
         for (let item in config) {
             switch (item) {
                 case 'get': case 'post': case 'put': case 'patch': case 'delete': {
                     const method = item.toUpperCase() as Router.HttpMethod;
                     const opConfig = buildOpConfig(method, route, config[item], this.defaults, corsHeaders);
-                    router.on(method, route, noop, opConfig);
+                    this.router.on(method, route, noop, opConfig);
                     break;
                 }
                 case 'cors': {
@@ -93,21 +91,28 @@ export class HttpController {
             }
         }
 
-        router.on('OPTIONS', route, noop, corsHeaders);
+        this.router.on('OPTIONS', route, noop, corsHeaders);
     }
 
+    segment(root: string, defaults?: HttpEndpointDefaults) {
+        root = util.cleanPath(root);
+        let segment = this.segments.get(root);
+        if (segment) {
+            throw new TypeError(`Cannot register segment: segment for '${root}' has already been registered`);
+        }
+        else {
+            segment = new HttpSegment(this, root, defaults);
+            this.segments.set(root, segment);
+        }
+        return segment;
+    }
+
+    // ROUTE HANDLING
+    // ---------------------------------------------------------------------------------------------
     async handler(context: AzureFunctionContext, request: AzureHttpRequest): Promise<AzureHttpResponse> {
 
-        // check if the route is registered
-        const functionName = context.executionContext.functionName;
-        const router = this.routers.get(functionName);
-        if (!router) {
-            throw new Error(`Router for '${functionName}' could not be found`);
-        }
-
-        const route = router.find(request.method, '/' + (request.params.route || ''));
-
         // 0 ----- make sure the request needs to be handled
+        const route = this.router.find(request.method, '/' + (request.params.route || ''));
         if (!route) {
             // route not found - return error
             return defaults.notFoundResponse;
@@ -199,17 +204,19 @@ export class HttpController {
                 const view = opConfig.view.call(viewContext, result, viewOptions);
 
                 if (!view) {
+                    // for GET requests return NotFound; otherwise NoContent
                     response =  {
-                        status  : HttpStatusCode.NotFound,
+                        status  : request.method === 'GET' ? HttpStatusCode.NotFound : HttpStatusCode.NoContent,
                         headers : opConfig.headers,
                         body    : null
                     };
                 }
                 else {
+                    const status = view[symbols.responseStatus] || HttpStatusCode.OK;
                     response =  {
-                        status  : view[symbols.responseStatus] || HttpStatusCode.OK,
+                        status  : status,
                         headers : { ...opConfig.headers, ...view[symbols.responseHeaders] },
-                        body    : view
+                        body    : status === HttpStatusCode.NoContent ? null : view
                     };
                 }
             }
@@ -282,18 +289,6 @@ function processOptions(options?: Partial<HttpControllerConfig>): HttpController
     }
 
     return newOptions;
-}
-
-function cleanPath(path: string) {
-    if (!path) throw new TypeError(`Route path '${path}' is not valid`);
-    if (typeof path !== 'string') throw new TypeError(`Route path ${path} is not valid: a path must be a string`);
-    if (path.charAt(0) !== '/') throw new TypeError(`Route path ${path} is not valid: a path must start with '/'`);
-    if (path !== '/') {
-        while (path.charAt(path.length - 1) === '/') {
-            path = path.slice(0, -1);   // removes last character
-        }
-    }
-    return path;
 }
 
 function buildCorsHeaders(config: HttpRouteConfig, defaultCors: CorsOptions) {

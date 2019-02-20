@@ -9,7 +9,7 @@ module.exports = controller;
 
 // ROUTES
 // =================================================================================================
-controller.set('HttpTrigger', '/', {
+controller.set('/', {
     get: {
         scope   : 'account:read',
         auth    : async function(scope, credentials) {
@@ -70,7 +70,7 @@ controller.set('HttpTrigger', '/', {
     }
 });
 
-controller.set('HttpTrigger', '/multipart', {
+controller.set('/multipart', {
     post: {
         inputs  : nova.parsers.multipart({ filter: { field: 'field3', maxCount: 1 }}),
         action  : async function (inputs) {
@@ -79,7 +79,7 @@ controller.set('HttpTrigger', '/multipart', {
     }
 });
 
-controller.set('HttpTrigger', '/view', {
+controller.set('/view', {
     get: {
         action  : async function (inputs) { 
             return {
@@ -92,6 +92,28 @@ controller.set('HttpTrigger', '/view', {
             const view = { result, context: this };
             view[nova.symbols.responseHeaders] = { 'Test-Header': 'test value' };
             return view;
+        }
+    }
+});
+
+const segment = controller.segment('/segment');
+
+segment.set('/', {
+    get: {
+        action: async function(inputs) {
+            return {
+                messge: 'segment root'
+            };
+        }
+    }
+});
+
+segment.set('/test', {
+    get: {
+        action: async function(inputs) {
+            return {
+                messge: 'segment test'
+            };
         }
     }
 });

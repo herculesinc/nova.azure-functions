@@ -138,7 +138,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                         [method]: { action }
                     };
 
-                    expect(() => controller.set('test', route, config)).to.not.throw();
+                    expect(() => controller.set(route, config)).to.not.throw();
                 });
             });
         });
@@ -154,7 +154,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     const uMethod = method.toUpperCase();
 
                     it(uMethod, () => {
-                        expect(() => controller.set('test', route, {[method]: {action}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: '${uMethod}' method is not supported`);
+                        expect(() => controller.set(route, {[method]: {action}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: '${uMethod}' method is not supported`);
                     });
                 });
             });
@@ -164,7 +164,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     const uMethod = method.toUpperCase();
 
                     it(uMethod, () => {
-                        expect(() => controller.set('test', route, {[method]: {}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: no actions were provided`);
+                        expect(() => controller.set(route, {[method]: {}} as HttpRouteConfig)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: no actions were provided`);
                     });
                 });
             });
@@ -176,8 +176,8 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                             [method]: { action }
                         };
 
-                        expect(() => controller.set('test', route, config)).to.not.throw();
-                        expect(() => controller.set('test', route, config)).to.throw(TypeError, `Invalid definition for '${route}' endpoint: conflicting endpoint handler found`);
+                        expect(() => controller.set(route, config)).to.not.throw();
+                        expect(() => controller.set(route, config)).to.throw(TypeError, `Invalid definition for '${route}' endpoint: conflicting endpoint handler found`);
                     });
                 });
             });
@@ -194,7 +194,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                             }
                         };
 
-                        expect(() => controller.set('test', route, config)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: 'action' and 'actions' cannot be provided at the same time`);
+                        expect(() => controller.set(route, config)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: 'action' and 'actions' cannot be provided at the same time`);
                     });
                 });
             });
@@ -210,7 +210,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                             }
                         };
 
-                        expect(() => controller.set('test', route, config)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: action must be a regular function`);
+                        expect(() => controller.set(route, config)).to.throw(TypeError, `Invalid definition for '${uMethod} ${route}' endpoint: action must be a regular function`);
                     });
                 });
             });
@@ -240,7 +240,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                 request = new AzureHttpReq('GET', 'http://test.com');
                 context = new AzureFuncContext('id', functionName);
 
-                controller.set(functionName, '/', config);
+                controller.set('/', config);
 
                 const {status, body} = await controller.handler(context, request );
 
@@ -310,7 +310,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     }
                 };
 
-                controller.set(functionName, '/:id', config);
+                controller.set('/:id', config);
 
                 try {
                     result = await controller.handler(context, request );
@@ -430,7 +430,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     }
                 };
 
-                controller.set(functionName, '/:id', config);
+                controller.set('/:id', config);
 
                 try {
                     result = await controller.handler(context, request );
@@ -506,7 +506,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     }
                 };
 
-                controller.set(functionName, '/:id', config);
+                controller.set('/:id', config);
 
                 try {
                     result = await controller.handler(context, request );
@@ -559,7 +559,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     }
                 };
 
-                controller.set(functionName, '/:id/participants/:ID', config);
+                controller.set('/:id/participants/:ID', config);
 
                 try {
                     result = await controller.handler(context, request );
@@ -617,7 +617,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     }
                 };
 
-                controller.set(functionName, '/', config);
+                controller.set('/', config);
 
                 try {
                     result = await controller.handler(context, request );
@@ -677,7 +677,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     }
                 };
 
-                controller.set(functionName, '/', config);
+                controller.set('/', config);
 
                 try {
                     result = await controller.handler(context, request );
@@ -718,7 +718,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     }
                 };
 
-                controller.set(functionName, '/', config);
+                controller.set('/', config);
 
                 try {
                     result = await controller.handler(context, request );
@@ -759,7 +759,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     }
                 };
 
-                controller.set(functionName, '/', config);
+                controller.set('/', config);
 
                 try {
                     result = await controller.handler(context, request );
@@ -793,7 +793,7 @@ describe('NOVA.AZURE-FUNCTIONS -> \'HttpController\' tests;', () => {
                     }
                 };
 
-                controller.set(functionName, '/', config);
+                controller.set('/', config);
 
                 try {
                     result = await controller.handler(context, request );

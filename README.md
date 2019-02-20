@@ -14,18 +14,18 @@ index.js
 const nova = require('@nova/azure-functions');
 const controller = new nova.HttpController();
 
-controller.set('HttpTrigger', '/', {
+controller.set('/', {
     get: {
-        action: (inputs, context) => {
-            context.log.info('Some debug message');
+        action: async function (inputs) {
+            this.log.info('Some debug message');
             return {
                 message: `Hello ${inputs.name}!`
             };
         }
     },
     post: {
-        action: (inputs, context) => {
-            context.log.info('Some other debug message');
+        action: async function (inputs) {
+            this.log.info('Some other debug message');
             const userId = inputs.userId;
             // make some updates here
         }
@@ -46,7 +46,7 @@ function.json
       "type": "httpTrigger",
       "direction": "in",
       "name": "request",
-      "route": "HttpTrigger/{*route}"
+      "route": "{*route}"
     },
     {
       "type": "http",

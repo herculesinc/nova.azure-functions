@@ -74,6 +74,25 @@ function matchIpV4(value) {
         return result[0];
 }
 exports.matchIpV4 = matchIpV4;
+// PATH CHECKING
+// =================================================================================================
+function cleanPath(path) {
+    if (!path)
+        throw new TypeError(`Path '${path}' is not valid`);
+    if (typeof path !== 'string')
+        throw new TypeError(`Path '${path}' is not valid: path must be a string`);
+    if (path.charAt(0) !== '/')
+        throw new TypeError(`Path '${path}' is not valid: path must start with '/'`);
+    if (path !== '/') {
+        while (path.charAt(path.length - 1) === '/') {
+            path = path.slice(0, -1); // removes last character
+            if (path.length === 1)
+                break;
+        }
+    }
+    return path;
+}
+exports.cleanPath = cleanPath;
 // FUNCTION CHECKING
 // =================================================================================================
 function isRegularFunction(fun) {

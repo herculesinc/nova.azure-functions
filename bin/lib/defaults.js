@@ -8,7 +8,9 @@ const core_1 = require("@nova/core");
 exports.defaults = {
     httpController: {
         adapter: defaultHttpOperationAdapter,
-        routerOptions: undefined,
+        routerOptions: {
+            ignoreTrailingSlash: true
+        },
         rethrowThreshold: 500 /* InternalServerError */,
         defaults: {
             cors: {

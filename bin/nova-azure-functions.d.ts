@@ -49,8 +49,8 @@ declare module "@nova/azure-functions" {
     }
 
     export interface HttpEndpointDefaults {
-        scope?      : string;
         cors?       : CorsOptions;
+        scope?      : string;
         auth?       : Authenticator;
         mutator?    : HttpInputMutator;
         view?       : ViewBuilder;
@@ -95,11 +95,16 @@ declare module "@nova/azure-functions" {
         view?   : any;
     }
 
+    export interface HttpSegment {
+        set(path: string, config: HttpRouteConfig): void;
+    }
+
     export class HttpController {
 
         constructor(options?: HttpControllerConfig);
 
-        set(functionName: string, path: string, config: HttpRouteConfig): void;
+        set(path: string, config: HttpRouteConfig)              : void;
+        segment(root: string, defaults?: HttpEndpointDefaults)  : HttpSegment
 
         handler(context: AzureFunctionContext, request: AzureHttpRequest): Promise<AzureHttpResponse>;
     }
