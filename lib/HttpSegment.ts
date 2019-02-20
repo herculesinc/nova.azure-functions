@@ -1,6 +1,6 @@
 // IMPORTS
 // =================================================================================================
-import { HttpController, HttpEndpointDefaults, HttpRouteConfig, HttpEndpointConfig } from "@nova/azure-functions";
+import { HttpController, HttpEndpointDefaults, HttpRouteConfig } from "@nova/azure-functions";
 import * as util from './util';
 
 // CLASS DEFINITION
@@ -17,7 +17,7 @@ export class HttpSegment {
         this.controller = controller;
         this.root = util.cleanPath(path);
         if (defaults) {
-            this.defaults = { ...defaults, cors: { ...defaults.cors } };
+            this.defaults = validateDefaults(defaults, this.root);
         }
     }
 
@@ -34,6 +34,27 @@ export class HttpSegment {
 
 // HELPER FUNCTIONS
 // =================================================================================================
+function validateDefaults(defaults: HttpEndpointDefaults, root: string) {
+
+    if (!util.isRegularFunction(defaults.auth)) {
+        throw new TypeError(`Invalid definition for '${root}' segment: authenticator must be a regular function`);
+    }
+
+    if (!util.isRegularFunction(defaults.mutator)) {
+        throw new TypeError(`Invalid definition for '${root}' segment: mutator must be a regular function`);
+    }
+
+    if (!util.isRegularFunction(defaults.view)) {
+        throw new TypeError(`Invalid definition for '${root}' segment: view builder must be a regular function`);
+    }
+
+    const validated = { ...defaults };
+    validated.cors = { ...defaults.cors };
+
+    return validated;
+
+}
+
 function applyDefaults(config: HttpRouteConfig, defaults: HttpEndpointDefaults, path: string): HttpRouteConfig {
     
     const merged: HttpRouteConfig = {};

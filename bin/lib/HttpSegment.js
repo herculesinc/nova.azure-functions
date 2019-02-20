@@ -10,7 +10,7 @@ class HttpSegment {
         this.controller = controller;
         this.root = util.cleanPath(path);
         if (defaults) {
-            this.defaults = Object.assign({}, defaults, { cors: Object.assign({}, defaults.cors) });
+            this.defaults = validateDefaults(defaults, this.root);
         }
     }
     // ROUTE REGISTRATION
@@ -26,6 +26,20 @@ class HttpSegment {
 exports.HttpSegment = HttpSegment;
 // HELPER FUNCTIONS
 // =================================================================================================
+function validateDefaults(defaults, root) {
+    if (!util.isRegularFunction(defaults.auth)) {
+        throw new TypeError(`Invalid definition for '${root}' segment: authenticator must be a regular function`);
+    }
+    if (!util.isRegularFunction(defaults.mutator)) {
+        throw new TypeError(`Invalid definition for '${root}' segment: mutator must be a regular function`);
+    }
+    if (!util.isRegularFunction(defaults.view)) {
+        throw new TypeError(`Invalid definition for '${root}' segment: view builder must be a regular function`);
+    }
+    const validated = Object.assign({}, defaults);
+    validated.cors = Object.assign({}, defaults.cors);
+    return validated;
+}
 function applyDefaults(config, defaults, path) {
     const merged = {};
     for (let item in config) {
