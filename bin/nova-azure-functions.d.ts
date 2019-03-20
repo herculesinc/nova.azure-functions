@@ -18,7 +18,7 @@ declare module "@nova/azure-functions" {
     };
 
     export const parsers: {
-        multipart       : HttpInputParser;
+        multipart       : (config?: MultipartConfig) => HttpInputParser;
     };
 
     // HTTP CONTROLLER
@@ -101,7 +101,7 @@ declare module "@nova/azure-functions" {
 
     export class HttpController {
 
-        constructor(options?: HttpControllerConfig);
+        constructor(options?: Partial<HttpControllerConfig>);
 
         set(path: string, config: HttpRouteConfig)              : void;
         segment(root: string, defaults?: HttpEndpointDefaults)  : HttpSegment

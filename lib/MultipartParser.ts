@@ -2,7 +2,7 @@
 // =================================================================================================
 import * as Busboy from 'busboy';
 import { AzureHttpRequest } from 'azure-functions';
-import { HttpInputParser, MultipartConfig, MultipartFilter, Operation } from '@nova/azure-functions';
+import { HttpInputParser, MultipartConfig, MultipartFilter } from '@nova/azure-functions';
 import { defaults } from './defaults';
 
 // PUBLIC FUNCTIONS
