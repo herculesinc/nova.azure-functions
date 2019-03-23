@@ -7,9 +7,10 @@ import { defaults } from './defaults';
 
 // PUBLIC FUNCTIONS
 // =================================================================================================
-export function buildParser(options?: MultipartConfig): HttpInputParser {
+export function buildParser(options?: Partial<MultipartConfig>): HttpInputParser {
 
-    options = options || defaults.multipartParser;
+    // TODO: validate options
+    options = options || {};
     const filters = buildFilters(options.filter);
     const busboyConfig = buildBusboyConfig(options);
 
@@ -147,7 +148,7 @@ function buildFilters(filterOrFilters: MultipartFilter | MultipartFilter[]): Map
     return filterMap;
 }
 
-function buildBusboyConfig(options: MultipartConfig): Busboy.BusboyConfig {
+function buildBusboyConfig(options: Partial<MultipartConfig>): Busboy.BusboyConfig {
 
     return {
         highWaterMark   : defaults.multipartParser.bodyHighWaterMark,

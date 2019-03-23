@@ -1,6 +1,6 @@
 {
   "name": "@nova/azure-functions",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Serverless action-based Web API framework written in TypeScript",
   "keywords": [
     "restful",

@@ -7,8 +7,8 @@ declare module "@nova/azure-functions" {
     import { Executable, Context, Action } from '@nova/core';
     export { Operation, Action, Logger, TraceSource, TraceCommand } from '@nova/core';
 
-    import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
-    export { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse } from 'azure-functions';
+    import { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse, HttpMethod } from 'azure-functions';
+    export { AzureFunctionContext, AzureHttpRequest, AzureHttpResponse, HttpMethod } from 'azure-functions';
 
     // GLOBALS
     // --------------------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ declare module "@nova/azure-functions" {
     };
 
     export const parsers: {
-        multipart       : (config?: MultipartConfig) => HttpInputParser;
+        multipart       : (config?: Partial<MultipartConfig>) => HttpInputParser;
     };
 
     // HTTP CONTROLLER
@@ -37,15 +37,19 @@ declare module "@nova/azure-functions" {
     }
 
     export interface HttpOperationAdapter {
-        (context: AzureFunctionContext, request: HttpRequestHead, actions: Action[], options?: any): Executable & Context;
+        (context: AzureFunctionContext, request: HttpRequestHead, actions: Action[], options?: HttpRequestOptions): Executable & Context;
     }
 
     export interface HttpRequestHead {
         route       : string;
-        method      : string;
+        method      : HttpMethod;
         headers     : StringBag;
         ip          : string;
         url         : string;
+    }
+
+    export interface HttpRequestOptions {
+        readonly?   : boolean;
     }
 
     export interface HttpEndpointDefaults {
@@ -186,18 +190,18 @@ declare module "@nova/azure-functions" {
     }
 
     export interface MultipartConfig {
-        limits?         : MultipartLimits;
-        filter?         : MultipartFilter | MultipartFilter[];
+        limits          : Partial<MultipartLimits>;
+        filter          : MultipartFilter | MultipartFilter[];
     }
 
     export interface MultipartLimits {
-        fieldNameSize?  : number;
+        fieldNameSize   : number;
         fieldSize       : number;
-        fields?         : number;
-        fileSize?       : number;
-        files?          : number;
-        parts?          : number;
-        headerPairs?    : number;
+        fields          : number;
+        fileSize        : number;
+        files           : number;
+        parts           : number;
+        headerPairs     : number;
     }
 
     export interface MultipartFilter {

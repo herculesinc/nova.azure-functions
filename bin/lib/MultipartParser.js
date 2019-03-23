@@ -7,7 +7,8 @@ const defaults_1 = require("./defaults");
 // PUBLIC FUNCTIONS
 // =================================================================================================
 function buildParser(options) {
-    options = options || defaults_1.defaults.multipartParser;
+    // TODO: validate options
+    options = options || {};
     const filters = buildFilters(options.filter);
     const busboyConfig = buildBusboyConfig(options);
     return function (request, params, defaults) {
