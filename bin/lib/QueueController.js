@@ -26,20 +26,29 @@ class QueueController {
         }
         let operation = undefined;
         try {
-            // 1 ----- create operation context
-            const operation = this.adapter(context, opConfig.actions, opConfig.options);
-            // 2 ----- build action inputs
+            // 1 ----- determine payload and correlation ID
+            let payload, correlationId;
+            if (message._data && message._meta) {
+                payload = message._data;
+                correlationId = message._meta.opid;
+            }
+            else {
+                payload = message;
+            }
+            // 2 ----- create operation context
+            const operation = this.adapter(context, opConfig.actions, opConfig.options, correlationId);
+            // 3 ----- build action inputs
             let actionInputs = undefined;
             if (opConfig.processor) {
                 const meta = buildMessageMetadata(context.bindingData);
-                actionInputs = opConfig.processor.call(operation, message, opConfig.defaults, meta);
+                actionInputs = await opConfig.processor.call(operation, payload, opConfig.defaults, meta);
             }
             else {
-                actionInputs = message;
+                actionInputs = payload;
             }
-            // 3 ----- execute actions
+            // 4 ----- execute actions
             const result = await operation.execute(actionInputs);
-            // 4 ----- log the operation and return the result
+            // 5 ----- log the operation and return the result
             operation.log.close(201, true); // TODO: set status to something else?
             return result;
         }

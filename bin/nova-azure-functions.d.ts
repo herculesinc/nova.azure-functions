@@ -120,8 +120,10 @@ declare module "@nova/azure-functions" {
     }
 
     export interface QueueOperationAdapter {
-        (context: AzureFunctionContext, actions: Action[], options?: any): Executable & Context;
+        (context: AzureFunctionContext, actions: Action[], options?: QueueTaskOptions, correlationId?: string): Executable & Context;
     }
+
+    export interface QueueTaskOptions {}
 
     export interface QueueTaskConfig {
         options?    : any;
@@ -132,7 +134,7 @@ declare module "@nova/azure-functions" {
     }
 
     export interface QueueInputProcessor {
-        (this: Context, message: any, defaults: any, meta: QueueMessageMetadata): any;
+        (this: Context, message: any, defaults: any, meta: QueueMessageMetadata): Promise<any>;
     }
 
     export interface QueueMessageMetadata {
@@ -249,7 +251,7 @@ declare module '@nova/core' {
 
     export interface Logger {
 
-        readonly operationId    : string;
+        readonly operationId?   : string;
         authenticatedUserId?    : string;
 
         close(resultCode: number, success: boolean, properties?: { [key: string]: string; } ): void;

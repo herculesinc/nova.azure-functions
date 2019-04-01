@@ -60,12 +60,12 @@ function defaultHttpOperationAdapter(context, request, actions) {
     const logger = buildDefaultLogger(context, operationName);
     return new core_1.Operation(config, undefined, logger);
 }
-function defaultQueueOperationAdapter(context, actions) {
+function defaultQueueOperationAdapter(context, actions, options, correlationId) {
     const operationName = context.executionContext.functionName;
     const config = {
         id: context.invocationId,
         name: operationName,
-        origin: 'undefined',
+        origin: correlationId || 'undefined',
         actions: actions
     };
     const logger = buildDefaultLogger(context, operationName);

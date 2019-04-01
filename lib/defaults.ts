@@ -80,13 +80,13 @@ function defaultHttpOperationAdapter(context: AzureFunctionContext, request: Htt
     return new Operation(config, undefined, logger);
 }
 
-function defaultQueueOperationAdapter(context: AzureFunctionContext, actions: Action[]): Operation {
+function defaultQueueOperationAdapter(context: AzureFunctionContext, actions: Action[], options?: any, correlationId?: string): Operation {
     const operationName = context.executionContext.functionName;
 
     const config = {
         id          : context.invocationId,
         name        : operationName,
-        origin      : 'undefined',
+        origin      : correlationId || 'undefined',
         actions     : actions
     };
     const logger = buildDefaultLogger(context, operationName);

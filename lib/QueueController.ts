@@ -41,7 +41,7 @@ export class QueueController<O> {
         this.taskMap.set(functionName, opConfig);
     }
 
-    async handler(context: AzureFunctionContext, message: object): Promise<void> {
+    async handler(context: AzureFunctionContext, message: any): Promise<void> {
         
         // 0 ----- make sure the task can be handled
         const functionName = context.executionContext.functionName;
@@ -52,23 +52,33 @@ export class QueueController<O> {
 
         let operation: Executable & Context = undefined;
         try {
-            // 1 ----- create operation context
-            const operation = this.adapter(context, opConfig.actions, opConfig.options);
-
-            // 2 ----- build action inputs
-            let actionInputs = undefined;
-            if (opConfig.processor) {
-                const meta = buildMessageMetadata(context.bindingData as any);
-                actionInputs = opConfig.processor.call(operation, message, opConfig.defaults, meta);
+            // 1 ----- determine payload and correlation ID
+            let payload: any, correlationId: string;
+            if (message._data && message._meta) {
+                payload = message._data;
+                correlationId = message._meta.opid;
             }
             else {
-                actionInputs = message;
+                payload = message;
             }
 
-            // 3 ----- execute actions
+            // 2 ----- create operation context
+            const operation = this.adapter(context, opConfig.actions, opConfig.options, correlationId);
+
+            // 3 ----- build action inputs
+            let actionInputs = undefined;
+            if (opConfig.processor) {
+                const meta = buildMessageMetadata(context.bindingData as AzureQueueBidingData);
+                actionInputs = await opConfig.processor.call(operation, payload, opConfig.defaults, meta);
+            }
+            else {
+                actionInputs = payload;
+            }
+
+            // 4 ----- execute actions
             const result = await operation.execute(actionInputs);
 
-            // 4 ----- log the operation and return the result
+            // 5 ----- log the operation and return the result
             operation.log.close(201, true);         // TODO: set status to something else?
             return result;
         }
